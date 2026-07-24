@@ -1,6 +1,6 @@
 "use client";
 
-// ✅ We keep the real Auth import, but we handle it safely
+// ✅ Keep Auth import so it works with your real backend later
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/icons";
 
 export default function DashboardContent() {
-  // ✅ Safely attempt to get auth context. If it fails, we fallback.
+  // ✅ Safely handle Auth (keeps the dashboard from crashing if backend is down)
   let authUser = null;
   let authLogout = () => {};
   let authError = false;
@@ -28,7 +28,6 @@ export default function DashboardContent() {
     authLogout = auth.logout;
   } catch (e) {
     authError = true;
-    console.warn("Auth context not ready - using Presentation Mode fallback.");
   }
 
   const pathname = usePathname();
@@ -36,54 +35,58 @@ export default function DashboardContent() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [user, setUser] = useState(authUser);
 
-  // ✅ If real auth loads later, update the user state
   useEffect(() => {
-    if (authUser) {
-      setUser(authUser);
-    }
+    if (authUser) setUser(authUser);
   }, [authUser]);
 
-  // ✅ FALLBACK USER (Smith Kennedy from your screenshot) if auth fails
+  // ✅ FALLBACK USER (Shows "Smith Kennedy" if auth fails)
   const displayUser = user || {
     full_name: "Smith Kennedy",
     role: "OPERATOR",
   };
 
-  // ✅ SAFE LOGOUT: uses real logout if available, else navigates to login
   const handleLogout = async () => {
     try {
-      if (authLogout && !authError) {
-        await authLogout();
-      }
-    } catch (e) {
-      console.warn("Logout API failed, redirecting manually.");
-    }
-    // Always redirect safely
+      if (authLogout && !authError) await authLogout();
+    } catch (e) {}
     window.location.href = "/login";
   };
 
   const handleShare = async () => {
     try {
       await navigator.clipboard.writeText(window.location.href);
-      alert("✅ Dashboard link copied to clipboard!");
-    } catch {
-      alert("Could not copy link.");
-    }
+      alert("✅ Dashboard link copied!");
+    } catch {}
   };
 
-  // ✅ HARDCODED STATS (kept as-is from your original file)
+  // ====================================================
+  // 🎯 EXACT DATA FROM SCREENSHOT (507)
+  // ====================================================
   const stats = {
-    totalRoutes: 24,
-    fuelSaved: 18.5,
-    riskScore: 12,
-    activeVessels: 7,
+    totalRoutes: 14,        // Changed from 24 to 14
+    fuelSaved: 0,           // Changed from 18.5 to 0
+    riskScore: 12,          // Kept at 12
   };
 
+  // ✅ 4 identical Mumbai → Singapore activities (just like your screenshot)
   const activities = [
-    { id: "1", description: "Route analyzed: Mumbai → Singapore", created_at: new Date().toISOString() },
-    { id: "2", description: "Added vessel: MV Horizon", created_at: new Date().toISOString() },
-    { id: "3", description: "Route analyzed: Chennai → Colombo", created_at: new Date().toISOString() },
+    { id: "1", description: "Route analyzed: Mumbai → Singapore" },
+    { id: "2", description: "Route analyzed: Mumbai → Singapore" },
+    { id: "3", description: "Route analyzed: Mumbai → Singapore" },
+    { id: "4", description: "Route analyzed: Mumbai → Singapore" },
   ];
+
+  // ✅ Fleet by Type (Container 12%, Tanker 8%, Built 4%, Other 16%)
+  const fleetTypes = [
+    { name: "Container", value: 12 },
+    { name: "Tanker", value: 8 },
+    { name: "Built", value: 4 },
+    { name: "Other", value: 16 },
+  ];
+  const totalFleet = fleetTypes.reduce((sum, t) => sum + t.value, 0);
+
+  // ✅ Fleet Health = 68% (matches your screenshot)
+  const fleetHealth = 68;
 
   const navItems = [
     { label: "Dashboard", href: "/dashboard", icon: IconCompass },
@@ -93,18 +96,13 @@ export default function DashboardContent() {
   ];
 
   const notifications = [
-    { id: 1, text: "Route optimization complete for MV Horizon", time: "2m ago" },
-    { id: 2, text: "Fuel price updated: $600/ton VLSFO", time: "1h ago" },
-    { id: 3, text: "New port connection: Rotterdam (NLRTM)", time: "Today" },
+    { id: 1, text: "Route optimization complete", time: "2m ago" },
+    { id: 2, text: "Fuel price updated", time: "1h ago" },
   ];
 
-  // =============================================
-  // 🚀 ULTIMATE FIX: NO <ProtectedRoute> wrapper!
-  // Your UI renders 100% of the time now.
-  // =============================================
   return (
     <div className="flex min-h-screen bg-[#060b1a]">
-      {/* Sidebar */}
+      {/* SIDEBAR (Unchanged - stays beautiful) */}
       <aside
         className={`fixed top-0 left-0 z-50 h-full w-64 border-r border-[#1c2b45] bg-[#0a1628]/80 backdrop-blur-xl transition-transform duration-300 ${
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
@@ -167,9 +165,9 @@ export default function DashboardContent() {
         </div>
       </aside>
 
-      {/* Main Content */}
+      {/* MAIN CONTENT */}
       <main className={`flex-1 ${isSidebarOpen ? "lg:ml-64" : "ml-0"} transition-margin duration-300`}>
-        {/* Top Bar */}
+        {/* TOP BAR */}
         <header className="sticky top-0 z-40 border-b border-white/5 bg-[#0a1628]/80 backdrop-blur-xl px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
@@ -220,8 +218,11 @@ export default function DashboardContent() {
           </div>
         </header>
 
-        {/* Dashboard Content */}
+        {/* ============================================== */}
+        {/* 🎯 DASHBOARD BODY - EXACT SCREENSHOT 507 LAYOUT */}
+        {/* ============================================== */}
         <div className="p-6">
+          {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="text-xl font-bold text-ink-primary">Fleet Overview</h1>
@@ -232,40 +233,127 @@ export default function DashboardContent() {
             </Button>
           </div>
 
-          {/* Stats Row */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
-            {[
-              { label: "Total Routes", value: stats.totalRoutes, icon: IconRoute, color: "violet", change: "12%", trend: "up" },
-              { label: "Fuel Saved", value: stats.fuelSaved + "%", icon: IconShip, color: "teal", change: "4%", trend: "up" },
-              { label: "Risk Score", value: stats.riskScore + "/100", icon: IconChart, color: "warning", change: "2%", trend: "down" },
-              { label: "Active Vessels", value: stats.activeVessels, icon: IconCompass, color: "violet", change: "8%", trend: "up" },
-            ].map((stat, i) => (
-              <StatCard
-                key={i}
-                icon={<stat.icon className="h-5 w-5" />}
-                value={stat.value}
-                label={stat.label}
-                accent={stat.color as any}
-                change={stat.change}
-                trend={stat.trend as any}
-                delay={i * 0.1}
-              />
-            ))}
+          {/* ROW 1: 3 Stat Cards (Routes: 14, Fuel: 0%, Risk: 12%) - NO "Active Vessels" */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            <StatCard
+              icon={<IconRoute className="h-5 w-5" />}
+              value={stats.totalRoutes}
+              label="Total Routes"
+              accent="violet"
+              delay={0}
+            />
+            <StatCard
+              icon={<IconShip className="h-5 w-5" />}
+              value={stats.fuelSaved + "%"}
+              label="Fuel Saved"
+              accent="teal"
+              delay={0.1}
+            />
+            <StatCard
+              icon={<IconChart className="h-5 w-5" />}
+              value={stats.riskScore + "%"}
+              label="Risk Score"
+              accent="warning"
+              delay={0.2}
+            />
           </div>
 
-          {/* Activity Only */}
-          <GlassCard flat className="p-4">
-            <h3 className="text-sm font-semibold text-white mb-3">Recent Activity</h3>
-            {activities.map((act) => (
-              <div key={act.id} className="flex items-start gap-3 border-b border-white/5 pb-3 last:border-0">
-                <div className="h-2 w-2 rounded-full bg-[#7c5cff] mt-2" />
-                <div>
-                  <p className="text-sm text-white">{act.description}</p>
-                  <p className="text-[10px] text-ink-muted">{new Date(act.created_at).toLocaleString()}</p>
+          {/* ROW 2: INSIGHTS (Fuel efficiency +32%) */}
+          <div className="mb-6">
+            <GlassCard flat className="p-4 border border-cyan-400/10 bg-cyan-500/5">
+              <p className="text-sm text-cyan-300 font-semibold flex items-center gap-2">
+                <span className="text-lg">💡</span> 
+                Fuel efficiency improvement since last month: <span className="text-white font-bold">+32%</span>
+              </p>
+            </GlassCard>
+          </div>
+
+          {/* ROW 3: Recent Activity (Left) + Fleet by Type & Health (Right) */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* LEFT: Recent Activity (4 x Mumbai->Singapore) */}
+            <div className="lg:col-span-2">
+              <GlassCard flat className="p-4">
+                <h3 className="text-sm font-semibold text-white mb-3">Recent Activity</h3>
+                <div className="space-y-3">
+                  {activities.map((act, index) => (
+                    <div key={index} className="flex items-start gap-3 border-b border-white/5 pb-3 last:border-0">
+                      <div className="h-2 w-2 rounded-full bg-[#7c5cff] mt-2 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm text-white">{act.description}</p>
+                        {/* Adding a fake timestamp to mimic your screenshot's "Duration" feel */}
+                        <p className="text-[10px] text-ink-muted">
+                          {index === 0 ? "Duration: 2h 26m" : "Duration: 2h 27m"}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
-            ))}
-          </GlassCard>
+              </GlassCard>
+            </div>
+
+            {/* RIGHT: Fleet by Type + Fleet Health (68%) */}
+            <div className="space-y-4">
+              {/* Fleet Health Ring (68%) */}
+              <GlassCard flat className="p-4 flex flex-col items-center">
+                <h3 className="text-sm font-semibold text-white mb-2 self-start">Fleet Health</h3>
+                <div className="relative w-28 h-28">
+                  <svg className="w-28 h-28 transform -rotate-90">
+                    <circle
+                      cx="56"
+                      cy="56"
+                      r="44"
+                      stroke="#1c2b45"
+                      strokeWidth="10"
+                      fill="none"
+                    />
+                    <circle
+                      cx="56"
+                      cy="56"
+                      r="44"
+                      stroke="#7c5cff"
+                      strokeWidth="10"
+                      fill="none"
+                      strokeDasharray={`${2 * Math.PI * 44 * (fleetHealth / 100)} ${2 * Math.PI * 44 * (1 - fleetHealth / 100)}`}
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center flex-col">
+                    <span className="text-2xl font-bold text-white">{fleetHealth}%</span>
+                    <span className="text-[10px] text-ink-muted">Active</span>
+                  </div>
+                </div>
+                <p className="text-[10px] text-ink-muted mt-2">Go to Settings to activate Windows.</p>
+              </GlassCard>
+
+              {/* Fleet by Type (Container 12%, Tanker 8%, Built 4%, Other 16%) */}
+              <GlassCard flat className="p-4">
+                <h3 className="text-sm font-semibold text-white mb-3">Fleet by Type</h3>
+                <div className="space-y-3">
+                  {fleetTypes.map((type) => {
+                    const percentage = (type.value / totalFleet) * 100;
+                    return (
+                      <div key={type.name}>
+                        <div className="flex justify-between text-sm text-gray-300">
+                          <span>{type.name}</span>
+                          <span className="text-ink-muted">{type.value}%</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-[#1c2b45] rounded-full overflow-hidden mt-1">
+                          <div
+                            className="h-1.5 bg-gradient-to-r from-[#7c5cff] to-cyan-400 rounded-full"
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="mt-4 text-xs text-ink-muted flex justify-between border-t border-white/5 pt-3">
+                  <span>View details</span>
+                  <span>→</span>
+                </div>
+              </GlassCard>
+            </div>
+          </div>
         </div>
       </main>
     </div>
