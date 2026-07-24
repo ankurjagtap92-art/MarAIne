@@ -1,3 +1,5 @@
+"use client";  // ✅ YE LINE DAALO
+
 import dynamic from "next/dynamic";
 
 const DashboardContent = dynamic(() => import("./DashboardContent"), {
