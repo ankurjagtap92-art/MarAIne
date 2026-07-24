@@ -26,32 +26,18 @@ def analyze_route(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """
-    Analyze a route using AI and store the results in the database.
-    """
     try:
-        # 1. Validate vessel exists and belongs to user
-        if not isinstance(request.vessel_id, UUID):
-            try:
-                vessel_uuid = UUID(str(request.vessel_id))
-            except:
-                raise HTTPException(status_code=400, detail="Invalid vessel ID format")
-        else:
-            vessel_uuid = request.vessel_id
-
+        # 1. Validate vessel
         vessel = db.query(Vessel).filter(
-            Vessel.id == vessel_uuid,
+            Vessel.id == request.vessel_id,
             Vessel.user_id == current_user.id
         ).first()
         if not vessel:
             raise HTTPException(status_code=404, detail="Vessel not found")
 
-        # ✅ 1.5: Find or create ports (or use dummy ports for now)
-        # For MVP, we'll use dummy port IDs. In production, you'd have a ports table.
-        # Let's create dummy ports if they don't exist.
+        # 2. Find or create ports (so we have their IDs)
         origin_port = db.query(Port).filter(Port.name == request.origin_port).first()
         if not origin_port:
-            # Create a dummy port
             origin_port = Port(
                 id=uuid4(),
                 name=request.origin_port,
@@ -76,7 +62,7 @@ def analyze_route(
             db.add(dest_port)
             db.flush()
 
-        # 2. Generate route options (AI or mock)
+        # 3. Generate options (AI or mock)
         result = generate_route_options(
             vessel=vessel,
             origin=request.origin_port,
@@ -84,19 +70,15 @@ def analyze_route(
             priority=request.priority
         )
         options = result.get("options", [])
-        ai_explanation = result.get(
-            "explanation",
-            "AI-generated route options based on your vessel profile, weather, and optimization priority."
-        )
+        ai_explanation = result.get("explanation", "AI-generated route options.")
 
-        # 3. Create analysis record with CORRECT field names
-        analysis_id = uuid4()
+        # 4. Create the RouteAnalysis record
         analysis = RouteAnalysis(
-            id=analysis_id,
+            id=uuid4(),
             user_id=current_user.id,
-            vessel_id=vessel_uuid,
-            origin_port_id=origin_port.id,       # ✅ FIXED: use origin_port_id
-            destination_port_id=dest_port.id,    # ✅ FIXED: use destination_port_id
+            vessel_id=request.vessel_id,
+            origin_port_id=origin_port.id,
+            destination_port_id=dest_port.id,
             priority=request.priority,
             departure_date=request.departure_date,
             max_acceptable_risk=request.max_acceptable_risk,
@@ -109,21 +91,22 @@ def analyze_route(
         db.add(analysis)
         db.flush()
 
-        # 4. Store each RouteOption and its Waypoints
+        # 5. Store route options and waypoints
+        option_responses = []
         for opt in options:
+            # Convert time to float
             time_value = opt.get("time", 0)
             if isinstance(time_value, str):
                 try:
                     time_hours = float(time_value.split()[0])
-                except (ValueError, IndexError):
+                except:
                     time_hours = 24.0
             else:
                 time_hours = float(time_value)
 
-            route_option_id = uuid4()
             route_option = RouteOption(
-                id=route_option_id,
-                analysis_id=analysis_id,
+                id=uuid4(),
+                analysis_id=analysis.id,
                 route_type=opt.get("route_type", "balanced"),
                 total_distance_nm=float(opt.get("distance", 0)),
                 estimated_duration_hours=time_hours,
@@ -136,10 +119,11 @@ def analyze_route(
             db.add(route_option)
             db.flush()
 
+            # Waypoints
             for wpt in opt.get("waypoints", []):
                 waypoint = Waypoint(
                     id=uuid4(),
-                    route_option_id=route_option_id,
+                    route_option_id=route_option.id,
                     sequence_number=wpt.get("sequence", 1),
                     latitude=float(wpt.get("lat", 0.0)),
                     longitude=float(wpt.get("lon", 0.0)),
@@ -147,10 +131,51 @@ def analyze_route(
                 )
                 db.add(waypoint)
 
+            # Build response object for this option
+            option_responses.append(RouteOptionResponse(
+                id=route_option.id,
+                analysis_id=route_option.analysis_id,
+                route_type=route_option.route_type,
+                total_distance_nm=route_option.total_distance_nm,
+                estimated_duration_hours=route_option.estimated_duration_hours,
+                avg_speed_knots=route_option.avg_speed_knots,
+                total_fuel_tons=route_option.total_fuel_tons,
+                fuel_cost_usd=route_option.fuel_cost_usd,
+                weather_risk_score=route_option.weather_risk_score,
+                piracy_risk_score=route_option.piracy_risk_score,
+                congestion_risk_score=route_option.congestion_risk_score,
+                overall_risk_score=route_option.overall_risk_score,
+                estimated_co2_tons=route_option.estimated_co2_tons,
+                route_geometry=route_option.route_geometry,
+                weather_summary=route_option.weather_summary,
+                is_recommended=route_option.is_recommended,
+                created_at=route_option.created_at
+            ))
+
         db.commit()
         db.refresh(analysis)
 
-        return analysis
+        # 6. Build final response with port names and options
+        response = RouteAnalysisResponse(
+            id=analysis.id,
+            vessel_id=analysis.vessel_id,
+            origin_port=origin_port.name,      # <-- string, not Port object
+            destination_port=dest_port.name,   # <-- string
+            priority=analysis.priority,
+            departure_date=analysis.departure_date,
+            max_acceptable_risk=analysis.max_acceptable_risk,
+            max_deviation_percent=analysis.max_deviation_percent,
+            total_options_generated=analysis.total_options_generated,
+            recommended_option_id=analysis.recommended_option_id,
+            ai_explanation=analysis.ai_explanation,
+            ai_model_used=analysis.ai_model_used,
+            status=analysis.status,
+            created_at=analysis.created_at,
+            completed_at=analysis.completed_at,
+            options=option_responses
+        )
+
+        return response
 
     except HTTPException:
         raise
