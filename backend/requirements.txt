@@ -15,3 +15,4 @@ passlib[bcrypt]
 requests
 google-generativeai
 openai
+email-validator
