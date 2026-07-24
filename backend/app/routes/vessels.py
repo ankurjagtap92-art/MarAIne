@@ -42,45 +42,17 @@ def create_vessel(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    db_vessel = Vessel(**vessel_data.dict(), user_id=current_user.id)
-    db.add(db_vessel)
-    db.commit()
-    db.refresh(db_vessel)
-    return db_vessel
+    try:
+        # Ensure all required fields are present
+        if not vessel_data.name or not vessel_data.vessel_type:
+            raise HTTPException(status_code=400, detail="Name and vessel_type are required")
 
-# ✅ PUT /{vessel_id} – update vessel
-@router.put("/{vessel_id}", response_model=VesselResponse)
-def update_vessel(
-    vessel_id: UUID,
-    vessel_data: VesselCreate,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    vessel = db.query(Vessel).filter(
-        Vessel.id == vessel_id,
-        Vessel.user_id == current_user.id
-    ).first()
-    if not vessel:
-        raise HTTPException(status_code=404, detail="Vessel not found")
-    for key, value in vessel_data.dict().items():
-        setattr(vessel, key, value)
-    db.commit()
-    db.refresh(vessel)
-    return vessel
-
-# ✅ DELETE /{vessel_id} – delete vessel
-@router.delete("/{vessel_id}")
-def delete_vessel(
-    vessel_id: UUID,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    vessel = db.query(Vessel).filter(
-        Vessel.id == vessel_id,
-        Vessel.user_id == current_user.id
-    ).first()
-    if not vessel:
-        raise HTTPException(status_code=404, detail="Vessel not found")
-    db.delete(vessel)
-    db.commit()
-    return {"message": "Vessel deleted successfully"}
+        db_vessel = Vessel(**vessel_data.dict(), user_id=current_user.id)
+        db.add(db_vessel)
+        db.commit()
+        db.refresh(db_vessel)
+        return db_vessel
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Vessel creation error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
