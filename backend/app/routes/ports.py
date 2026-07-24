@@ -14,7 +14,7 @@ def list_ports(
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    #current_user: User = Depends(get_current_user)
 ):
     """Get paginated list of ports."""
     ports = db.query(Port).order_by(Port.name).offset(offset).limit(limit).all()
