@@ -119,3 +119,7 @@ export default function Map({ ports = [], routes = [], height = "320px", center 
     </div>
   );
 }
+
+useEffect(() => {
+  console.log("Map component mounted");
+}, []);

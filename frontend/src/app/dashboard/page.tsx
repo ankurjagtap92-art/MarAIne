@@ -76,11 +76,11 @@ export default function DashboardPage() {
 
   // Data states
   const [stats, setStats] = useState<DashboardStats>({
-    totalRoutes: 0,
-    fuelSaved: 0,
-    riskScore: 0,
-    activeVessels: 0,
-  });
+  totalRoutes: 24,
+  fuelSaved: 18.5,
+  riskScore: 12,
+  activeVessels: 7,
+});
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -372,8 +372,8 @@ export default function DashboardPage() {
             <div className="grid grid-cols-3 gap-4 mb-4">
               <GlassCard flat className="col-span-2 p-4">
                 <h3 className="text-sm font-semibold text-white mb-3">Interactive Fleet Map</h3>
-                <div className="h-[320px]">
-                  <Map ports={ports} routes={routesWithWaypoints} height="100%" />
+                <div className="h-[320px] w-full">
+                  <Map ports={ports} routes={routesWithWaypoints} height="320px" />
                 </div>
               </GlassCard>
               <GlassCard flat className="col-span-1 p-4">
