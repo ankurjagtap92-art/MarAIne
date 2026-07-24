@@ -165,7 +165,7 @@ def analyze_route(
         )
 
 
-@router.get("", response_model=List[RouteAnalysisResponse])
+@router.get("/", response_model=List[RouteAnalysisResponse])
 def list_routes(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)

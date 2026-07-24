@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { GlassCard, StatCard, Button, Badge, GaugeChart as GaugeChart } from "@/components/ui";
+import { GlassCard, StatCard, Button, Badge } from "@/components/ui";
 import { Doughnut } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -25,9 +25,11 @@ import {
 } from "@/components/ui/icons";
 import api from "@/lib/api";
 
-// Register Chart.js
+// ✅ Register Chart.js
 ChartJS.register(ArcElement, Tooltip, Legend);
 
+// ✅ GaugeChart and Map are Client-only
+const GaugeChart = dynamic(() => import("@/components/ui/GaugeChart"), { ssr: false });
 const Map = dynamic(() => import("@/components/Map"), {
   ssr: false,
   loading: () => (
@@ -280,7 +282,7 @@ export default function DashboardPage() {
 
         {/* Main Content */}
         <main className={`flex-1 ${isSidebarOpen ? "lg:ml-64" : "ml-0"} transition-margin duration-300`}>
-          {/* Top Bar – pill nav removed */}
+          {/* Top Bar */}
           <header className="sticky top-0 z-40 border-b border-white/5 bg-[#0a1628]/80 backdrop-blur-xl px-6 py-3 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
@@ -291,16 +293,13 @@ export default function DashboardPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               </button>
-              {/* Page title removed – now it's in the content area */}
             </div>
 
             <div className="flex items-center gap-3">
-              {/* Search */}
               <button className="h-9 w-9 rounded-full border border-white/10 flex items-center justify-center text-ink-secondary hover:text-white hover:border-white/20 transition">
                 <IconSearch className="h-4 w-4" />
               </button>
 
-              {/* Notifications */}
               <div className="relative">
                 <button
                   onClick={() => setShowNotifications(!showNotifications)}
@@ -334,9 +333,9 @@ export default function DashboardPage() {
             </div>
           </header>
 
-          {/* Dashboard Content – Bento Grid with improvements */}
-          <div className="dashboard-shell">
-            {/* 1. Header row (title + share button) */}
+          {/* Dashboard Content – Bento Grid */}
+          <div className="dashboard-shell" suppressHydrationWarning>
+            {/* Header row */}
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h1 className="text-xl font-bold text-ink-primary">Fleet Overview</h1>
@@ -347,7 +346,7 @@ export default function DashboardPage() {
               </Button>
             </div>
 
-            {/* 2. Stats Row – tighter, with trend indicators */}
+            {/* Stats Row */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
               {[
                 { label: "Total Routes", value: stats.totalRoutes, icon: IconRoute, color: "violet", change: "12%", trend: "up" },
@@ -368,7 +367,7 @@ export default function DashboardPage() {
               ))}
             </div>
 
-            {/* 3. Map + Activity (2:1) */}
+            {/* Map + Activity */}
             <div className="grid grid-cols-3 gap-4 mb-4">
               <GlassCard flat className="col-span-2 p-4">
                 <h3 className="text-sm font-semibold text-white mb-3">Interactive Fleet Map</h3>
@@ -399,9 +398,9 @@ export default function DashboardPage() {
               </GlassCard>
             </div>
 
-            {/* 4. Charts Row – Insight, Donut, Gauge */}
+            {/* Charts Row */}
             <div className="grid grid-cols-3 gap-4">
-              {/* Insight Card – Vibrant Violet Gradient */}
+              {/* Insight Card */}
               <GlassCard flat className="col-span-1 bg-gradient-to-br from-[#7c5cff] to-violet-700 border-none p-5 flex flex-col justify-between min-h-[180px]">
                 <div>
                   <p className="text-xs font-semibold text-white/70 uppercase tracking-wider">Insight</p>
@@ -413,7 +412,7 @@ export default function DashboardPage() {
                 </button>
               </GlassCard>
 
-              {/* Donut Chart – Fleet by Type */}
+              {/* Donut Chart */}
               <GlassCard flat className="col-span-1 p-4">
                 <h4 className="text-xs font-semibold text-ink-muted uppercase tracking-wider">Fleet by Type</h4>
                 <div className="h-32 mt-2 flex items-center justify-center">
@@ -443,7 +442,7 @@ export default function DashboardPage() {
                 </div>
               </GlassCard>
 
-              {/* Gauge – Fleet Health (semi‑circle) */}
+              {/* Gauge Chart */}
               <GlassCard flat className="col-span-1 p-4 flex flex-col items-center justify-center">
                 <h4 className="text-xs font-semibold text-ink-muted uppercase tracking-wider self-start">Fleet Health</h4>
                 <GaugeChart
@@ -454,9 +453,6 @@ export default function DashboardPage() {
                   className="mt-2"
                 />
               </GlassCard>
-            </div>
-            <div className="dashboard-shell" suppressHydrationWarning>
-              {/* ... */}
             </div>
           </div>
         </main>

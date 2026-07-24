@@ -5,7 +5,6 @@ MarAIne - FastAPI Application Entry Point
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
@@ -29,11 +28,9 @@ from .routes import (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
     print(f"🚢 {settings.APP_NAME} v{settings.APP_VERSION} starting...")
     print(f"   Environment: {'DEBUG' if settings.DEBUG else 'PRODUCTION'}")
-    
-    # ✅ Create tables
+
     try:
         Base.metadata.create_all(bind=engine)
         print("   ✅ Database tables verified/created")
@@ -43,7 +40,6 @@ async def lifespan(app: FastAPI):
     print(f"   API Docs: http://{settings.HOST}:{settings.PORT}/docs")
     yield
 
-    # Shutdown
     print(f"🛑 {settings.APP_NAME} shutting down...")
     engine.dispose()
     print("   Database connections closed.")
@@ -65,12 +61,12 @@ app = FastAPI(
 
 
 # ============================================
-# ✅ CORS MIDDLEWARE (Works for all routes, including OPTIONS)
+# CORS MIDDLEWARE
 # ============================================
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins (change in production)
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -79,14 +75,11 @@ app.add_middleware(
 
 
 # ============================================
-# ✅ Manual OPTIONS handler (for safety, if middleware misses)
+# OPTIONS HANDLER (CORS Preflight)
 # ============================================
 
 @app.options("/{path:path}")
 async def preflight_handler(request: Request, path: str):
-    """
-    Explicitly handle OPTIONS requests to ensure CORS headers.
-    """
     response = Response()
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
@@ -96,11 +89,11 @@ async def preflight_handler(request: Request, path: str):
 
 
 # ============================================
-# ROUTERS - REGISTER ALL ROUTES
+# ROUTERS - REGISTER ONCE
 # ============================================
 
 app.include_router(auth.router)
-app.include_router(ports.router)
+app.include_router(ports.router)       # ✅ ONLY ONCE
 app.include_router(vessels.router)
 app.include_router(route_routes.router)
 app.include_router(dashboard.router)
