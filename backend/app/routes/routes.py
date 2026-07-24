@@ -5,7 +5,7 @@ from datetime import datetime
 import uuid
 from uuid import UUID, uuid4
 import json
-
+from ..services.port_service import get_or_create_port
 from ..database import get_db
 from ..models import RouteAnalysis, RouteOption, Waypoint, Vessel, Port
 from ..schemas import (
@@ -35,32 +35,9 @@ def analyze_route(
         if not vessel:
             raise HTTPException(status_code=404, detail="Vessel not found")
 
-        # 2. Find or create ports (so we have their IDs)
-        origin_port = db.query(Port).filter(Port.name == request.origin_port).first()
-        if not origin_port:
-            origin_port = Port(
-                id=uuid4(),
-                name=request.origin_port,
-                country="Unknown",
-                unlocode=request.origin_port[:5].upper(),
-                latitude=0.0,
-                longitude=0.0
-            )
-            db.add(origin_port)
-            db.flush()
-
-        dest_port = db.query(Port).filter(Port.name == request.destination_port).first()
-        if not dest_port:
-            dest_port = Port(
-                id=uuid4(),
-                name=request.destination_port,
-                country="Unknown",
-                unlocode=request.destination_port[:5].upper(),
-                latitude=0.0,
-                longitude=0.0
-            )
-            db.add(dest_port)
-            db.flush()
+        # 2. Find or create ports (using the helper)
+        origin_port = get_or_create_port(db, request.origin_port, request.origin_port[:5].upper())
+        dest_port = get_or_create_port(db, request.destination_port, request.destination_port[:5].upper())
 
         # 3. Generate options (AI or mock)
         result = generate_route_options(
@@ -187,25 +164,22 @@ def analyze_route(
             detail=f"Internal error: {str(e)}"
         )
 
+
 @router.get("", response_model=List[RouteAnalysisResponse])
 def list_routes(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get all route analyses for the current user."""
-    # Query RouteAnalysis and join with Port to get origin/destination names
     routes = db.query(RouteAnalysis).filter(
         RouteAnalysis.user_id == current_user.id
     ).order_by(RouteAnalysis.created_at.desc()).all()
 
-    # Build response with port names
     result = []
     for route in routes:
-        # Get port names from the relationships
         origin_port = db.query(Port).filter(Port.id == route.origin_port_id).first()
         dest_port = db.query(Port).filter(Port.id == route.destination_port_id).first()
 
-        # Convert to response schema
         response = RouteAnalysisResponse(
             id=route.id,
             vessel_id=route.vessel_id,
@@ -222,7 +196,7 @@ def list_routes(
             status=route.status,
             created_at=route.created_at,
             completed_at=route.completed_at,
-            options=[]  # or load options if needed
+            options=[]
         )
         result.append(response)
 
@@ -235,7 +209,6 @@ def get_route(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get a specific route analysis by ID with all its options."""
     route = db.query(RouteAnalysis).filter(
         RouteAnalysis.id == route_id,
         RouteAnalysis.user_id == current_user.id
@@ -243,19 +216,15 @@ def get_route(
     if not route:
         raise HTTPException(status_code=404, detail="Route not found")
 
-    # Get port names
     origin_port = db.query(Port).filter(Port.id == route.origin_port_id).first()
     dest_port = db.query(Port).filter(Port.id == route.destination_port_id).first()
 
-    # ✅ Fetch all route options for this analysis
     options = db.query(RouteOption).filter(
         RouteOption.analysis_id == route.id
     ).all()
 
-    # Convert options to response schema
     option_responses = []
     for opt in options:
-        # You can optionally fetch waypoints if needed, but skip for brevity
         option_responses.append(RouteOptionResponse(
             id=opt.id,
             analysis_id=opt.analysis_id,
@@ -276,7 +245,6 @@ def get_route(
             created_at=opt.created_at
         ))
 
-    # Build full response
     response = RouteAnalysisResponse(
         id=route.id,
         vessel_id=route.vessel_id,
