@@ -5,6 +5,9 @@ MarAIne - FastAPI Application Entry Point
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response
 
 from .config import settings
 from .database import engine, Base
@@ -26,12 +29,11 @@ from .routes import (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup and shutdown events."""
     # Startup
     print(f"🚢 {settings.APP_NAME} v{settings.APP_VERSION} starting...")
     print(f"   Environment: {'DEBUG' if settings.DEBUG else 'PRODUCTION'}")
     
-    # ✅ Create database tables if they don't exist (no Alembic needed)
+    # ✅ Create tables
     try:
         Base.metadata.create_all(bind=engine)
         print("   ✅ Database tables verified/created")
@@ -39,7 +41,6 @@ async def lifespan(app: FastAPI):
         print(f"   ⚠️ Table creation error: {e}")
 
     print(f"   API Docs: http://{settings.HOST}:{settings.PORT}/docs")
-
     yield
 
     # Shutdown
@@ -64,19 +65,36 @@ app = FastAPI(
 
 
 # ============================================
-# CORS MIDDLEWARE
+# ✅ CORS MIDDLEWARE (Works for all routes, including OPTIONS)
 # ============================================
 
-@app.middleware("http")
-async def add_cors_headers(request, call_next):
-    response = await call_next(request)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins (change in production)
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+)
+
+
+# ============================================
+# ✅ Manual OPTIONS handler (for safety, if middleware misses)
+# ============================================
+
+@app.options("/{path:path}")
+async def preflight_handler(request: Request, path: str):
+    """
+    Explicitly handle OPTIONS requests to ensure CORS headers.
+    """
+    response = Response()
     response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Credentials"] = "true"
-    response.headers["Access-Control-Allow-Methods"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
     response.headers["Access-Control-Allow-Headers"] = "*"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
     return response
 
-    
+
 # ============================================
 # ROUTERS - REGISTER ALL ROUTES
 # ============================================
