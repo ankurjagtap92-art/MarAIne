@@ -1,11 +1,11 @@
 "use client";
 
-// ✅ Keep Auth import so it works with your real backend later
-import { useAuth } from "@/contexts/AuthContext";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
+import axios from "axios";
+
 import { GlassCard, StatCard, Button } from "@/components/ui";
 import {
   IconCompass,
@@ -16,9 +16,8 @@ import {
   IconBell,
   IconSearch,
 } from "@/components/ui/icons";
-import axios from "axios";
 
-// ✅ DYNAMIC IMPORT FOR MAP (ssr: false stops Leaflet from crashing)
+// ✅ Dynamically import Map with no SSR (prevents Leaflet crashes)
 const MapComponent = dynamic(() => import("@/components/Map"), {
   ssr: false,
   loading: () => (
@@ -31,44 +30,52 @@ const MapComponent = dynamic(() => import("@/components/Map"), {
   ),
 });
 
+// ============================================
+// DASHBOARD COMPONENT
+// ============================================
 export default function DashboardContent() {
-  // ✅ Safely handle Auth (keeps the dashboard from crashing if backend is down)
-  let authUser = null;
-  let authLogout = () => {};
-  let authError = false;
-  
-  try {
-    const auth = useAuth();
-    authUser = auth.user;
-    authLogout = auth.logout;
-  } catch (e) {
-    authError = true;
-  }
-
   const pathname = usePathname();
+  const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [user, setUser] = useState(authUser);
-  
-  // ✅ WEATHER STATE
-  const [weatherData, setWeatherData] = useState<{ [key: string]: { temp: number, condition: string } }>({});
+  const [weatherData, setWeatherData] = useState<{
+    [key: string]: { temp: number; condition: string };
+  }>({});
   const [weatherLoading, setWeatherLoading] = useState(true);
 
-  useEffect(() => {
-    if (authUser) setUser(authUser);
-  }, [authUser]);
+  // ✅ MOCK USER – no Auth dependency
+  const user = {
+    full_name: "Smith Kennedy",
+    role: "OPERATOR",
+  };
 
-  // ✅ FETCH WEATHER FOR MUMBAI & SINGAPORE
+  // ✅ Logout handler – clears storage and redirects
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    router.push("/login");
+  };
+
+  const handleShare = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      alert("✅ Dashboard link copied!");
+    } catch {
+      alert("Could not copy link.");
+    }
+  };
+
+  // ✅ Fetch weather for Mumbai & Singapore
   useEffect(() => {
     const fetchWeather = async () => {
-      const apiKey = process.env.NEXT_PUBLIC_OPENWEATHERMAP_API_KEY || "c387511366f2d5e041534c4397868669";
+      const apiKey = process.env.NEXT_PUBLIC_OPENWEATHERMAP_API_KEY || "";
       const cities = [
         { name: "Mumbai", lat: 19.0760, lon: 72.8777 },
         { name: "Singapore", lat: 1.3521, lon: 103.8198 },
       ];
-      
+
       try {
-        const results: { [key: string]: { temp: number, condition: string } } = {};
+        const results: { [key: string]: { temp: number; condition: string } } = {};
         for (const city of cities) {
           const response = await axios.get(
             `https://api.openweathermap.org/data/2.5/weather?lat=${city.lat}&lon=${city.lon}&appid=${apiKey}&units=metric`
@@ -79,9 +86,8 @@ export default function DashboardContent() {
           };
         }
         setWeatherData(results);
-      } catch (error) {
-        console.warn("Weather API unavailable, using fallback data.");
-        // Fallback weather (so UI doesn't break)
+      } catch {
+        // Fallback data
         setWeatherData({
           Mumbai: { temp: 28, condition: "Partly Cloudy" },
           Singapore: { temp: 31, condition: "Thunderstorm" },
@@ -93,29 +99,9 @@ export default function DashboardContent() {
     fetchWeather();
   }, []);
 
-  // ✅ FALLBACK USER (Shows "Smith Kennedy" if auth fails)
-  const displayUser = user || {
-    full_name: "Smith Kennedy",
-    role: "OPERATOR",
-  };
-
-  const handleLogout = async () => {
-    try {
-      if (authLogout && !authError) await authLogout();
-    } catch (e) {}
-    window.location.href = "/login";
-  };
-
-  const handleShare = async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      alert("✅ Dashboard link copied!");
-    } catch {}
-  };
-
-  // ====================================================
-  // 🎯 EXACT DATA FROM SCREENSHOT (507)
-  // ====================================================
+  // ============================================
+  // STATIC DATA (matches Screenshot 507)
+  // ============================================
   const stats = {
     totalRoutes: 14,
     fuelSaved: 0,
@@ -129,15 +115,22 @@ export default function DashboardContent() {
     { id: "4", description: "Route analyzed: Mumbai → Singapore" },
   ];
 
-  // ✅ HARDCODED PORTS FOR THE MAP (So it shows something beautiful immediately)
+  const fleetTypes = [
+    { name: "Container", value: 12 },
+    { name: "Tanker", value: 8 },
+    { name: "Built", value: 4 },
+    { name: "Other", value: 16 },
+  ];
+  const totalFleet = fleetTypes.reduce((sum, t) => sum + t.value, 0);
+  const fleetHealth = 68;
+
+  // ✅ Hardcoded ports and route for the map
   const mapPorts = [
     { id: "1", name: "Mumbai", unlocode: "INBOM", latitude: 19.0760, longitude: 72.8777 },
     { id: "2", name: "Singapore", unlocode: "SGSIN", latitude: 1.3521, longitude: 103.8198 },
     { id: "3", name: "Chennai", unlocode: "INMAA", latitude: 13.0827, longitude: 80.2707 },
     { id: "4", name: "Colombo", unlocode: "LKCMB", latitude: 6.9271, longitude: 79.8612 },
   ];
-
-  // ✅ HARDCODED ROUTE LINE (Mumbai -> Singapore)
   const mapRoutes = [
     {
       id: "1",
@@ -153,15 +146,6 @@ export default function DashboardContent() {
     },
   ];
 
-  const fleetTypes = [
-    { name: "Container", value: 12 },
-    { name: "Tanker", value: 8 },
-    { name: "Built", value: 4 },
-    { name: "Other", value: 16 },
-  ];
-  const totalFleet = fleetTypes.reduce((sum, t) => sum + t.value, 0);
-  const fleetHealth = 68;
-
   const navItems = [
     { label: "Dashboard", href: "/dashboard", icon: IconCompass },
     { label: "Routes", href: "/routes", icon: IconRoute },
@@ -174,9 +158,12 @@ export default function DashboardContent() {
     { id: 2, text: "Fuel price updated", time: "1h ago" },
   ];
 
+  // ============================================
+  // RENDER
+  // ============================================
   return (
     <div className="flex min-h-screen bg-[#060b1a]">
-      {/* SIDEBAR (Unchanged) */}
+      {/* SIDEBAR */}
       <aside
         className={`fixed top-0 left-0 z-50 h-full w-64 border-r border-[#1c2b45] bg-[#0a1628]/80 backdrop-blur-xl transition-transform duration-300 ${
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
@@ -222,11 +209,11 @@ export default function DashboardContent() {
         <div className="absolute bottom-0 left-0 right-0 border-t border-[#1c2b45] px-4 py-4">
           <div className="flex items-center gap-3 px-2 mb-3">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#7c5cff] to-blue-500 text-xs font-bold text-white">
-              {displayUser.full_name?.charAt(0)?.toUpperCase() || "U"}
+              {user.full_name.charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-ink-primary">{displayUser.full_name || "User"}</p>
-              <p className="text-[10px] uppercase text-ink-muted">{displayUser.role?.replace("_", " ") || "Operator"}</p>
+              <p className="truncate text-sm font-medium text-ink-primary">{user.full_name}</p>
+              <p className="text-[10px] uppercase text-ink-muted">{user.role.replace("_", " ")}</p>
             </div>
           </div>
           <button
@@ -286,15 +273,13 @@ export default function DashboardContent() {
               onClick={handleLogout}
               className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-ink-secondary hover:text-white transition"
             >
-              <span className="hidden md:inline">{displayUser.full_name?.split(" ")[0] || "User"}</span>
+              <span className="hidden md:inline">{user.full_name.split(" ")[0]}</span>
               <IconLogout className="h-4 w-4" />
             </button>
           </div>
         </header>
 
-        {/* ============================================== */}
-        {/* 🎯 DASHBOARD BODY WITH LIVE MAP                   */}
-        {/* ============================================== */}
+        {/* DASHBOARD BODY */}
         <div className="p-6">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
@@ -307,7 +292,7 @@ export default function DashboardContent() {
             </Button>
           </div>
 
-          {/* ROW 1: 3 Stat Cards (Routes: 14, Fuel: 0%, Risk: 12%) */}
+          {/* Stats Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             <StatCard
               icon={<IconRoute className="h-5 w-5" />}
@@ -332,24 +317,26 @@ export default function DashboardContent() {
             />
           </div>
 
-          {/* ROW 2: LIVE MAP + WEATHER WIDGET */}
+          {/* Map + Weather */}
           <div className="mb-6">
             <GlassCard flat className="p-4 relative">
               <div className="flex justify-between items-center mb-3">
                 <h3 className="text-sm font-semibold text-white">Live Maritime Map</h3>
                 <div className="flex gap-4 text-xs">
-                  {!weatherLoading && (
-                    <>
-                      {Object.entries(weatherData).map(([city, data]) => (
-                        <div key={city} className="flex items-center gap-2 bg-white/5 px-3 py-1 rounded-full border border-white/10">
-                          <span className="text-gray-400">{city}</span>
-                          <span className="text-cyan-300 font-bold">{data.temp}°C</span>
-                          <span className="text-gray-500 text-[10px]">{data.condition}</span>
-                        </div>
-                      ))}
-                    </>
+                  {!weatherLoading ? (
+                    Object.entries(weatherData).map(([city, data]) => (
+                      <div
+                        key={city}
+                        className="flex items-center gap-2 bg-white/5 px-3 py-1 rounded-full border border-white/10"
+                      >
+                        <span className="text-gray-400">{city}</span>
+                        <span className="text-cyan-300 font-bold">{data.temp}°C</span>
+                        <span className="text-gray-500 text-[10px]">{data.condition}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <span className="text-gray-500 text-xs">Fetching weather...</span>
                   )}
-                  {weatherLoading && <span className="text-gray-500 text-xs">Fetching weather...</span>}
                 </div>
               </div>
               <MapComponent ports={mapPorts} routes={mapRoutes} height="340px" />
@@ -359,19 +346,20 @@ export default function DashboardContent() {
             </GlassCard>
           </div>
 
-          {/* ROW 3: INSIGHTS (Fuel efficiency +32%) */}
+          {/* Insight */}
           <div className="mb-6">
             <GlassCard flat className="p-4 border border-cyan-400/10 bg-cyan-500/5">
               <p className="text-sm text-cyan-300 font-semibold flex items-center gap-2">
-                <span className="text-lg">💡</span> 
-                Fuel efficiency improvement since last month: <span className="text-white font-bold">+32%</span>
+                <span className="text-lg">💡</span>
+                Fuel efficiency improvement since last month:{" "}
+                <span className="text-white font-bold">+32%</span>
               </p>
             </GlassCard>
           </div>
 
-          {/* ROW 4: Recent Activity (Left) + Fleet by Type & Health (Right) */}
+          {/* Recent Activity + Fleet */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* LEFT: Recent Activity */}
+            {/* Recent Activity */}
             <div className="lg:col-span-2">
               <GlassCard flat className="p-4">
                 <h3 className="text-sm font-semibold text-white mb-3">Recent Activity</h3>
@@ -391,21 +379,14 @@ export default function DashboardContent() {
               </GlassCard>
             </div>
 
-            {/* RIGHT: Fleet by Type + Fleet Health */}
+            {/* Fleet Health & Types */}
             <div className="space-y-4">
-              {/* Fleet Health Ring */}
+              {/* Fleet Health */}
               <GlassCard flat className="p-4 flex flex-col items-center">
                 <h3 className="text-sm font-semibold text-white mb-2 self-start">Fleet Health</h3>
                 <div className="relative w-28 h-28">
                   <svg className="w-28 h-28 transform -rotate-90">
-                    <circle
-                      cx="56"
-                      cy="56"
-                      r="44"
-                      stroke="#1c2b45"
-                      strokeWidth="10"
-                      fill="none"
-                    />
+                    <circle cx="56" cy="56" r="44" stroke="#1c2b45" strokeWidth="10" fill="none" />
                     <circle
                       cx="56"
                       cy="56"
@@ -413,7 +394,9 @@ export default function DashboardContent() {
                       stroke="#7c5cff"
                       strokeWidth="10"
                       fill="none"
-                      strokeDasharray={`${2 * Math.PI * 44 * (fleetHealth / 100)} ${2 * Math.PI * 44 * (1 - fleetHealth / 100)}`}
+                      strokeDasharray={`${2 * Math.PI * 44 * (fleetHealth / 100)} ${
+                        2 * Math.PI * 44 * (1 - fleetHealth / 100)
+                      }`}
                       strokeLinecap="round"
                     />
                   </svg>

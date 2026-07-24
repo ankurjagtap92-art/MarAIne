@@ -170,38 +170,52 @@ def list_routes(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get all route analyses for the current user."""
-    routes = db.query(RouteAnalysis).filter(
-        RouteAnalysis.user_id == current_user.id
-    ).order_by(RouteAnalysis.created_at.desc()).all()
+    """
+    Get all route analyses for the current user.
+    Returns an empty list if none exist.
+    """
+    try:
+        routes = db.query(RouteAnalysis).filter(
+            RouteAnalysis.user_id == current_user.id
+        ).order_by(RouteAnalysis.created_at.desc()).all()
 
-    result = []
-    for route in routes:
-        origin_port = db.query(Port).filter(Port.id == route.origin_port_id).first()
-        dest_port = db.query(Port).filter(Port.id == route.destination_port_id).first()
+        result = []
+        for route in routes:
+            # Fetch port names safely
+            origin_port = db.query(Port).filter(Port.id == route.origin_port_id).first()
+            dest_port = db.query(Port).filter(Port.id == route.destination_port_id).first()
 
-        response = RouteAnalysisResponse(
-            id=route.id,
-            vessel_id=route.vessel_id,
-            origin_port=origin_port.name if origin_port else "Unknown",
-            destination_port=dest_port.name if dest_port else "Unknown",
-            priority=route.priority,
-            departure_date=route.departure_date,
-            max_acceptable_risk=route.max_acceptable_risk,
-            max_deviation_percent=route.max_deviation_percent,
-            total_options_generated=route.total_options_generated,
-            recommended_option_id=route.recommended_option_id,
-            ai_explanation=route.ai_explanation,
-            ai_model_used=route.ai_model_used,
-            status=route.status,
-            created_at=route.created_at,
-            completed_at=route.completed_at,
-            options=[]
+            # Build response manually
+            response = RouteAnalysisResponse(
+                id=route.id,
+                vessel_id=route.vessel_id,
+                origin_port=origin_port.name if origin_port else "Unknown",
+                destination_port=dest_port.name if dest_port else "Unknown",
+                priority=route.priority,
+                departure_date=route.departure_date,
+                max_acceptable_risk=route.max_acceptable_risk,
+                max_deviation_percent=route.max_deviation_percent,
+                total_options_generated=route.total_options_generated,
+                recommended_option_id=route.recommended_option_id,
+                ai_explanation=route.ai_explanation,
+                ai_model_used=route.ai_model_used,
+                status=route.status,
+                created_at=route.created_at,
+                completed_at=route.completed_at,
+                options=[]   # we don't need options in the list view
+            )
+            result.append(response)
+
+        return result
+
+    except Exception as e:
+        # Log the error for debugging (print or use logger)
+        print(f"❌ Error listing routes for user {current_user.id}: {e}")
+        # Re-raise a clean HTTP 500 with a generic message
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to load routes. Please try again later."
         )
-        result.append(response)
-
-    return result
-
 
 @router.get("/{route_id}", response_model=RouteAnalysisResponse)
 def get_route(
