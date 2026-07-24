@@ -68,6 +68,11 @@ export default function ProgressRing({
         {label && <span className="font-mono text-lg font-bold text-ink-primary">{label}</span>}
         {sublabel && <span className="text-[10px] text-ink-secondary">{sublabel}</span>}
       </div>
+      <div
+        suppressHydrationWarning
+        className={cn("relative inline-flex items-center justify-center", className)}
+        style={{ width: size, height: size }}
+      ></div>
     </div>
   );
 }

@@ -76,11 +76,11 @@ export default function DashboardPage() {
 
   // Data states
   const [stats, setStats] = useState<DashboardStats>({
-  totalRoutes: 24,
-  fuelSaved: 18.5,
-  riskScore: 12,
-  activeVessels: 7,
-});
+    totalRoutes: 24,
+    fuelSaved: 18.5,
+    riskScore: 12,
+    activeVessels: 7,
+  });
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -454,6 +454,9 @@ export default function DashboardPage() {
                   className="mt-2"
                 />
               </GlassCard>
+            </div>
+            <div className="dashboard-shell" suppressHydrationWarning>
+              {/* ... */}
             </div>
           </div>
         </main>

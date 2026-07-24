@@ -66,6 +66,11 @@ export default function GaugeChart({
         {label && <span className="font-mono text-xl font-bold text-ink-primary">{label}</span>}
         {sublabel && <span className="text-[11px] text-ink-secondary">{sublabel}</span>}
       </div>
+      <div
+        suppressHydrationWarning
+        className={cn("relative inline-flex flex-col items-center", className)}
+        style={{ width: size }}
+      ></div>
     </div>
   );
 }
