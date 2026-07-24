@@ -1,12 +1,13 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { motion, AnimatePresence } from "framer-motion";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PageTransition from "@/components/PageTransition";
 import { GlassCard, Button, Badge } from "@/components/ui";
-import { IconRoute } from "@/components/ui/icons";
-import { useEffect, useState } from "react";
+import { IconRoute, IconPlus } from "@/components/ui/icons";
 import api from "@/lib/api";
-import Link from "next/link";
 
 interface RouteItem {
   id: string;
@@ -15,9 +16,25 @@ interface RouteItem {
   priority: string;
   status: string;
   created_at: string;
-  vessel_id?: string;
-  vessel_name?: string;
 }
+
+// ✅ Skeleton loader
+const RouteSkeleton = () => (
+  <div className="bg-[#0a1628]/50 rounded-2xl border border-white/5 p-6 animate-pulse">
+    <div className="flex justify-between items-start mb-4">
+      <div>
+        <div className="h-4 w-20 bg-white/10 rounded mb-2" />
+        <div className="h-6 w-40 bg-white/10 rounded" />
+      </div>
+      <div className="h-6 w-20 bg-white/10 rounded-full" />
+    </div>
+    <div className="flex justify-between">
+      <div className="h-4 w-24 bg-white/10 rounded" />
+      <div className="h-4 w-20 bg-white/10 rounded" />
+    </div>
+    <div className="mt-4 h-9 w-full bg-white/10 rounded" />
+  </div>
+);
 
 export default function RoutesPage() {
   const [routes, setRoutes] = useState<RouteItem[]>([]);
@@ -27,13 +44,11 @@ export default function RoutesPage() {
   const fetchRoutes = async () => {
     try {
       setLoading(true);
-      // Try to fetch from backend
       const res = await api.get("/api/v1/routes");
       setRoutes(res.data);
       setError("");
     } catch (err: any) {
       console.error("Fetch routes error:", err);
-      // If 404, use localStorage mock
       if (err.response?.status === 404) {
         const mockRoutes = JSON.parse(localStorage.getItem("mockRoutes") || "[]");
         setRoutes(mockRoutes);
@@ -54,10 +69,20 @@ export default function RoutesPage() {
   if (loading) {
     return (
       <ProtectedRoute>
-        <div className="min-h-screen bg-[#060b1a] flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-12 h-12 border-4 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-gray-400 text-sm">Loading routes...</p>
+        <div className="min-h-screen bg-[#060b1a] p-8">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex justify-between items-center mb-8">
+              <div>
+                <h1 className="text-4xl font-bold text-white tracking-tight">Route Analysis</h1>
+                <p className="text-sm text-ink-secondary mt-1">View all your optimized routes</p>
+              </div>
+              <div className="h-12 w-36 bg-white/5 rounded-xl animate-pulse" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[...Array(6)].map((_, i) => (
+                <RouteSkeleton key={i} />
+              ))}
+            </div>
           </div>
         </div>
       </ProtectedRoute>
@@ -67,61 +92,128 @@ export default function RoutesPage() {
   return (
     <ProtectedRoute>
       <PageTransition>
-        <div className="min-h-screen bg-[#060b1a] p-8">
+        <div className="min-h-screen bg-[#060b1a] p-8 relative">
           <div className="max-w-7xl mx-auto">
-            <div className="flex justify-between items-center mb-6">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
               <div>
-                <h1 className="text-3xl font-bold text-white">Route Analysis</h1>
-                <p className="text-sm text-ink-secondary">View all your optimized routes</p>
+                <h1 className="text-4xl font-bold text-white tracking-tight flex items-center gap-3">
+                  <span className="bg-gradient-to-r from-cyan-400 to-violet-500 bg-clip-text text-transparent">
+                    Route Analysis
+                  </span>
+                  <span className="text-sm font-normal bg-white/5 px-3 py-1 rounded-full text-ink-secondary border border-white/5">
+                    {routes.length} routes
+                  </span>
+                </h1>
+                <p className="text-sm text-ink-secondary mt-1">View all your optimized routes</p>
               </div>
               <Link href="/routes/new">
-                <Button size="lg">+ New Route</Button>
+                <Button size="lg" className="group relative overflow-hidden">
+                  <span className="absolute inset-0 bg-gradient-to-r from-cyan-400 to-violet-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <span className="relative flex items-center gap-2">
+                    <IconPlus className="h-5 w-5" />
+                    New Route
+                  </span>
+                </Button>
               </Link>
             </div>
 
             {error && (
-              <div className="bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-sm rounded-lg p-3 mb-6">
+              <div className="bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-sm rounded-lg p-4 mb-6 backdrop-blur-sm">
                 {error}
               </div>
             )}
 
-            {routes.length === 0 ? (
-              <GlassCard glow className="p-12 text-center text-ink-secondary">
-                <IconRoute className="h-16 w-16 mx-auto text-ink-muted mb-4" />
-                <p className="text-lg">No routes analyzed yet</p>
-                <p className="text-sm text-ink-muted">Start optimizing your first route</p>
-                <Link href="/routes/new" className="mt-4 inline-block">
-                  <Button>Analyze Route</Button>
-                </Link>
-              </GlassCard>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {routes.map((route) => (
-                  <GlassCard key={route.id} glow className="p-6 hover:border-cyan-400/30 transition-all">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <p className="text-sm text-ink-secondary">Origin → Destination</p>
-                        <p className="text-lg font-semibold text-white">
-                          {route.origin_port} → {route.destination_port}
-                        </p>
+            <AnimatePresence mode="wait">
+              {routes.length === 0 ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                >
+                  <GlassCard glow className="p-16 text-center border border-white/5 relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-violet-500/5" />
+                    <div className="relative z-10">
+                      <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-cyan-400/20 to-violet-500/20 flex items-center justify-center border border-white/10 mb-6">
+                        <IconRoute className="h-10 w-10 text-ink-muted" />
                       </div>
-                      <Badge variant={route.status === "completed" ? "success" : "warning"}>
-                        {route.status || "completed"}
-                      </Badge>
-                    </div>
-                    <div className="flex justify-between text-sm text-ink-secondary">
-                      <span>Priority: <span className="text-white capitalize">{route.priority}</span></span>
-                      <span>{new Date(route.created_at).toLocaleDateString()}</span>
-                    </div>
-                    <div className="mt-4">
-                      <Link href={`/routes/${route.id}`}>
-                        <Button variant="outline" size="sm" fullWidth>View Details</Button>
+                      <h3 className="text-2xl font-semibold text-white mb-2">No routes analyzed yet</h3>
+                      <p className="text-ink-secondary mb-6">Start optimizing your first route with AI-powered insights</p>
+                      <Link href="/routes/new">
+                        <Button size="lg" className="group">
+                          <span className="flex items-center gap-2">
+                            Analyze Route
+                            {/* Inline SVG ArrowUpRight */}
+                            <svg className="h-4 w-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M7 17L17 7" />
+                              <path d="M7 7h10v10" />
+                            </svg>
+                          </span>
+                        </Button>
                       </Link>
                     </div>
                   </GlassCard>
-                ))}
-              </div>
-            )}
+                </motion.div>
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+                >
+                  {routes.map((route, index) => (
+                    <motion.div
+                      key={route.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      whileHover={{ y: -4, scale: 1.01 }}
+                      className="group"
+                    >
+                      <GlassCard glow className="p-6 border border-white/5 hover:border-cyan-400/30 transition-all duration-300 relative overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-violet-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                        <div className="relative z-10">
+                          <div className="flex items-start justify-between mb-4">
+                            <div>
+                              <p className="text-xs font-medium text-ink-muted uppercase tracking-wider">Route</p>
+                              <h3 className="text-lg font-semibold text-white mt-1">
+                                {route.origin_port} <span className="text-ink-muted">→</span> {route.destination_port}
+                              </h3>
+                            </div>
+                            <Badge
+                              variant={route.status === "completed" ? "success" : "warning"}
+                              className="capitalize"
+                            >
+                              <span className="flex items-center gap-1.5">
+                                <span className={`w-1.5 h-1.5 rounded-full ${route.status === "completed" ? "bg-green-400" : "bg-yellow-400"} animate-pulse`} />
+                                {route.status || "completed"}
+                              </span>
+                            </Badge>
+                          </div>
+                          <div className="flex items-center justify-between text-sm text-ink-secondary">
+                            <span>
+                              Priority: <span className="text-white capitalize font-medium">{route.priority}</span>
+                            </span>
+                            <span>{new Date(route.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                          </div>
+                          <div className="mt-5 pt-4 border-t border-white/5">
+                            <Link href={`/routes/${route.id}`}>
+                              <Button variant="outline" size="sm" fullWidth className="group-hover:border-cyan-400/50 transition-colors">
+                                View Details
+                                {/* Inline SVG ArrowUpRight */}
+                                <svg className="h-4 w-4 ml-1 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M7 17L17 7" />
+                                  <path d="M7 7h10v10" />
+                                </svg>
+                              </Button>
+                            </Link>
+                          </div>
+                        </div>
+                      </GlassCard>
+                    </motion.div>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </PageTransition>

@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PageTransition from "@/components/PageTransition";
 import { GlassCard, Button, Input, Select } from "@/components/ui";
+import { IconShip } from "@/components/ui/icons";
 import api from "@/lib/api";
 
 interface VesselData {
@@ -99,11 +100,30 @@ export default function EditVesselPage() {
       <PageTransition>
         <div className="min-h-screen bg-[#060b1a] p-8">
           <div className="max-w-2xl mx-auto">
-            <h1 className="text-3xl font-bold text-white mb-6">Edit Vessel</h1>
-            <GlassCard glow className="p-8">
-              <form onSubmit={handleSubmit} className="space-y-5">
+            <button
+              onClick={() => router.push("/vessels")}
+              className="flex items-center gap-2 text-ink-secondary hover:text-white transition-colors mb-6 group"
+            >
+              {/* Inline SVG ArrowLeft */}
+              <svg className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M19 12H5" />
+                <path d="M12 19l-7-7 7-7" />
+              </svg>
+              Back to Vessels
+            </button>
+
+            <h1 className="text-4xl font-bold text-white tracking-tight mb-2">
+              <span className="bg-gradient-to-r from-cyan-400 to-violet-500 bg-clip-text text-transparent">
+                Edit Vessel
+              </span>
+            </h1>
+            <p className="text-ink-secondary mb-8">Update your vessel's details</p>
+
+            <GlassCard glow className="p-8 border border-white/5 relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-violet-500/5" />
+              <form onSubmit={handleSubmit} className="relative z-10 space-y-5">
                 {error && (
-                  <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-lg p-3">
+                  <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-lg p-3 backdrop-blur-sm">
                     {error}
                   </div>
                 )}
@@ -116,6 +136,7 @@ export default function EditVesselPage() {
                   onChange={handleChange}
                   required
                   disabled={submitting}
+                  className="border border-white/10 focus:border-cyan-400/50"
                 />
 
                 <Input
@@ -125,6 +146,7 @@ export default function EditVesselPage() {
                   value={formData.imo_number}
                   onChange={handleChange}
                   disabled={submitting}
+                  className="border border-white/10 focus:border-cyan-400/50"
                 />
 
                 <Select
@@ -134,6 +156,7 @@ export default function EditVesselPage() {
                   onChange={handleChange}
                   required
                   disabled={submitting}
+                  className="border border-white/10 focus:border-cyan-400/50"
                 >
                   <option value="">Select vessel type...</option>
                   {vesselTypes.map((type) => (
@@ -153,6 +176,7 @@ export default function EditVesselPage() {
                     value={formData.service_speed_knots}
                     onChange={handleChange}
                     disabled={submitting}
+                    className="border border-white/10 focus:border-cyan-400/50"
                   />
                   <Input
                     label="Fuel Consumption (tons/day)"
@@ -163,6 +187,7 @@ export default function EditVesselPage() {
                     value={formData.fuel_consumption_tons_per_day}
                     onChange={handleChange}
                     disabled={submitting}
+                    className="border border-white/10 focus:border-cyan-400/50"
                   />
                 </div>
 
@@ -175,11 +200,21 @@ export default function EditVesselPage() {
                   value={formData.max_wave_height_meters}
                   onChange={handleChange}
                   disabled={submitting}
+                  className="border border-white/10 focus:border-cyan-400/50"
                 />
 
                 <div className="flex gap-3 pt-4">
-                  <Button type="submit" size="lg" loading={submitting}>
-                    {submitting ? "Saving..." : "Save Changes"}
+                  <Button
+                    type="submit"
+                    size="lg"
+                    loading={submitting}
+                    className="group relative overflow-hidden flex-1"
+                  >
+                    <span className="absolute inset-0 bg-gradient-to-r from-cyan-400 to-violet-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    <span className="relative flex items-center justify-center gap-2">
+                      <IconShip className="h-5 w-5" />
+                      {submitting ? "Saving..." : "Save Changes"}
+                    </span>
                   </Button>
                   <Button
                     type="button"
@@ -187,6 +222,7 @@ export default function EditVesselPage() {
                     size="lg"
                     onClick={() => router.push("/vessels")}
                     disabled={submitting}
+                    className="flex-1"
                   >
                     Cancel
                   </Button>
