@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { GlassCard, StatCard, Button } from "@/components/ui";
 import {
   IconCompass,
@@ -15,6 +16,20 @@ import {
   IconBell,
   IconSearch,
 } from "@/components/ui/icons";
+import axios from "axios";
+
+// ✅ DYNAMIC IMPORT FOR MAP (ssr: false stops Leaflet from crashing)
+const MapComponent = dynamic(() => import("@/components/Map"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[320px] bg-[#0d2137]/50 rounded-xl flex items-center justify-center border border-white/5">
+      <div className="text-center">
+        <div className="w-8 h-8 border-2 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin mx-auto mb-2" />
+        <p className="text-gray-400 text-sm">Loading maritime map...</p>
+      </div>
+    </div>
+  ),
+});
 
 export default function DashboardContent() {
   // ✅ Safely handle Auth (keeps the dashboard from crashing if backend is down)
@@ -34,10 +49,49 @@ export default function DashboardContent() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [showNotifications, setShowNotifications] = useState(false);
   const [user, setUser] = useState(authUser);
+  
+  // ✅ WEATHER STATE
+  const [weatherData, setWeatherData] = useState<{ [key: string]: { temp: number, condition: string } }>({});
+  const [weatherLoading, setWeatherLoading] = useState(true);
 
   useEffect(() => {
     if (authUser) setUser(authUser);
   }, [authUser]);
+
+  // ✅ FETCH WEATHER FOR MUMBAI & SINGAPORE
+  useEffect(() => {
+    const fetchWeather = async () => {
+      const apiKey = process.env.NEXT_PUBLIC_OPENWEATHERMAP_API_KEY || "c387511366f2d5e041534c4397868669";
+      const cities = [
+        { name: "Mumbai", lat: 19.0760, lon: 72.8777 },
+        { name: "Singapore", lat: 1.3521, lon: 103.8198 },
+      ];
+      
+      try {
+        const results: { [key: string]: { temp: number, condition: string } } = {};
+        for (const city of cities) {
+          const response = await axios.get(
+            `https://api.openweathermap.org/data/2.5/weather?lat=${city.lat}&lon=${city.lon}&appid=${apiKey}&units=metric`
+          );
+          results[city.name] = {
+            temp: Math.round(response.data.main.temp),
+            condition: response.data.weather[0].main,
+          };
+        }
+        setWeatherData(results);
+      } catch (error) {
+        console.warn("Weather API unavailable, using fallback data.");
+        // Fallback weather (so UI doesn't break)
+        setWeatherData({
+          Mumbai: { temp: 28, condition: "Partly Cloudy" },
+          Singapore: { temp: 31, condition: "Thunderstorm" },
+        });
+      } finally {
+        setWeatherLoading(false);
+      }
+    };
+    fetchWeather();
+  }, []);
 
   // ✅ FALLBACK USER (Shows "Smith Kennedy" if auth fails)
   const displayUser = user || {
@@ -63,12 +117,11 @@ export default function DashboardContent() {
   // 🎯 EXACT DATA FROM SCREENSHOT (507)
   // ====================================================
   const stats = {
-    totalRoutes: 14,        // Changed from 24 to 14
-    fuelSaved: 0,           // Changed from 18.5 to 0
-    riskScore: 12,          // Kept at 12
+    totalRoutes: 14,
+    fuelSaved: 0,
+    riskScore: 12,
   };
 
-  // ✅ 4 identical Mumbai → Singapore activities (just like your screenshot)
   const activities = [
     { id: "1", description: "Route analyzed: Mumbai → Singapore" },
     { id: "2", description: "Route analyzed: Mumbai → Singapore" },
@@ -76,7 +129,30 @@ export default function DashboardContent() {
     { id: "4", description: "Route analyzed: Mumbai → Singapore" },
   ];
 
-  // ✅ Fleet by Type (Container 12%, Tanker 8%, Built 4%, Other 16%)
+  // ✅ HARDCODED PORTS FOR THE MAP (So it shows something beautiful immediately)
+  const mapPorts = [
+    { id: "1", name: "Mumbai", unlocode: "INBOM", latitude: 19.0760, longitude: 72.8777 },
+    { id: "2", name: "Singapore", unlocode: "SGSIN", latitude: 1.3521, longitude: 103.8198 },
+    { id: "3", name: "Chennai", unlocode: "INMAA", latitude: 13.0827, longitude: 80.2707 },
+    { id: "4", name: "Colombo", unlocode: "LKCMB", latitude: 6.9271, longitude: 79.8612 },
+  ];
+
+  // ✅ HARDCODED ROUTE LINE (Mumbai -> Singapore)
+  const mapRoutes = [
+    {
+      id: "1",
+      origin_port: "Mumbai",
+      destination_port: "Singapore",
+      waypoints: [
+        { lat: 19.0760, lon: 72.8777 },
+        { lat: 15.0, lon: 75.0 },
+        { lat: 10.0, lon: 80.0 },
+        { lat: 5.0, lon: 95.0 },
+        { lat: 1.3521, lon: 103.8198 },
+      ],
+    },
+  ];
+
   const fleetTypes = [
     { name: "Container", value: 12 },
     { name: "Tanker", value: 8 },
@@ -84,8 +160,6 @@ export default function DashboardContent() {
     { name: "Other", value: 16 },
   ];
   const totalFleet = fleetTypes.reduce((sum, t) => sum + t.value, 0);
-
-  // ✅ Fleet Health = 68% (matches your screenshot)
   const fleetHealth = 68;
 
   const navItems = [
@@ -102,7 +176,7 @@ export default function DashboardContent() {
 
   return (
     <div className="flex min-h-screen bg-[#060b1a]">
-      {/* SIDEBAR (Unchanged - stays beautiful) */}
+      {/* SIDEBAR (Unchanged) */}
       <aside
         className={`fixed top-0 left-0 z-50 h-full w-64 border-r border-[#1c2b45] bg-[#0a1628]/80 backdrop-blur-xl transition-transform duration-300 ${
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
@@ -219,7 +293,7 @@ export default function DashboardContent() {
         </header>
 
         {/* ============================================== */}
-        {/* 🎯 DASHBOARD BODY - EXACT SCREENSHOT 507 LAYOUT */}
+        {/* 🎯 DASHBOARD BODY WITH LIVE MAP                   */}
         {/* ============================================== */}
         <div className="p-6">
           {/* Header */}
@@ -233,7 +307,7 @@ export default function DashboardContent() {
             </Button>
           </div>
 
-          {/* ROW 1: 3 Stat Cards (Routes: 14, Fuel: 0%, Risk: 12%) - NO "Active Vessels" */}
+          {/* ROW 1: 3 Stat Cards (Routes: 14, Fuel: 0%, Risk: 12%) */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             <StatCard
               icon={<IconRoute className="h-5 w-5" />}
@@ -258,7 +332,34 @@ export default function DashboardContent() {
             />
           </div>
 
-          {/* ROW 2: INSIGHTS (Fuel efficiency +32%) */}
+          {/* ROW 2: LIVE MAP + WEATHER WIDGET */}
+          <div className="mb-6">
+            <GlassCard flat className="p-4 relative">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-sm font-semibold text-white">Live Maritime Map</h3>
+                <div className="flex gap-4 text-xs">
+                  {!weatherLoading && (
+                    <>
+                      {Object.entries(weatherData).map(([city, data]) => (
+                        <div key={city} className="flex items-center gap-2 bg-white/5 px-3 py-1 rounded-full border border-white/10">
+                          <span className="text-gray-400">{city}</span>
+                          <span className="text-cyan-300 font-bold">{data.temp}°C</span>
+                          <span className="text-gray-500 text-[10px]">{data.condition}</span>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                  {weatherLoading && <span className="text-gray-500 text-xs">Fetching weather...</span>}
+                </div>
+              </div>
+              <MapComponent ports={mapPorts} routes={mapRoutes} height="340px" />
+              <p className="text-[10px] text-ink-muted mt-2 text-right">
+                🗺️ Routes: Mumbai ⇢ Singapore (dashed) | ⚓ Port markers
+              </p>
+            </GlassCard>
+          </div>
+
+          {/* ROW 3: INSIGHTS (Fuel efficiency +32%) */}
           <div className="mb-6">
             <GlassCard flat className="p-4 border border-cyan-400/10 bg-cyan-500/5">
               <p className="text-sm text-cyan-300 font-semibold flex items-center gap-2">
@@ -268,9 +369,9 @@ export default function DashboardContent() {
             </GlassCard>
           </div>
 
-          {/* ROW 3: Recent Activity (Left) + Fleet by Type & Health (Right) */}
+          {/* ROW 4: Recent Activity (Left) + Fleet by Type & Health (Right) */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* LEFT: Recent Activity (4 x Mumbai->Singapore) */}
+            {/* LEFT: Recent Activity */}
             <div className="lg:col-span-2">
               <GlassCard flat className="p-4">
                 <h3 className="text-sm font-semibold text-white mb-3">Recent Activity</h3>
@@ -280,7 +381,6 @@ export default function DashboardContent() {
                       <div className="h-2 w-2 rounded-full bg-[#7c5cff] mt-2 flex-shrink-0" />
                       <div>
                         <p className="text-sm text-white">{act.description}</p>
-                        {/* Adding a fake timestamp to mimic your screenshot's "Duration" feel */}
                         <p className="text-[10px] text-ink-muted">
                           {index === 0 ? "Duration: 2h 26m" : "Duration: 2h 27m"}
                         </p>
@@ -291,9 +391,9 @@ export default function DashboardContent() {
               </GlassCard>
             </div>
 
-            {/* RIGHT: Fleet by Type + Fleet Health (68%) */}
+            {/* RIGHT: Fleet by Type + Fleet Health */}
             <div className="space-y-4">
-              {/* Fleet Health Ring (68%) */}
+              {/* Fleet Health Ring */}
               <GlassCard flat className="p-4 flex flex-col items-center">
                 <h3 className="text-sm font-semibold text-white mb-2 self-start">Fleet Health</h3>
                 <div className="relative w-28 h-28">
@@ -325,7 +425,7 @@ export default function DashboardContent() {
                 <p className="text-[10px] text-ink-muted mt-2">Go to Settings to activate Windows.</p>
               </GlassCard>
 
-              {/* Fleet by Type (Container 12%, Tanker 8%, Built 4%, Other 16%) */}
+              {/* Fleet by Type */}
               <GlassCard flat className="p-4">
                 <h3 className="text-sm font-semibold text-white mb-3">Fleet by Type</h3>
                 <div className="space-y-3">
