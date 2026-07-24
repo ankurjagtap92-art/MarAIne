@@ -17,7 +17,7 @@ from ..schemas import (
 from ..services.auth import get_current_user
 from ..services.route_engine import generate_route_options
 
-router = APIRouter(prefix="/api/v1/routes", tags=["routes"])
+router = APIRouter(prefix="/api/v1/routes", tags=["Routes"])
 
 
 @router.post("/analyze", response_model=RouteAnalysisResponse)
