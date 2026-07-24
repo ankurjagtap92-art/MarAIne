@@ -60,9 +60,14 @@ class VesselBase(BaseModel):
 class VesselCreate(VesselBase):
     pass
 
-class VesselUpdate(VesselBase):
+class VesselUpdate(BaseModel):
     name: Optional[str] = None
+    imo_number: Optional[str] = None
     vessel_type: Optional[str] = None
+    service_speed_knots: Optional[float] = None
+    fuel_consumption_tons_per_day: Optional[float] = None
+    max_wave_height_meters: Optional[float] = None
+    # Add any other fields you have
 
 class VesselResponse(VesselBase):
     id: UUID

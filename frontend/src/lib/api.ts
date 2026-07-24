@@ -39,12 +39,3 @@ api.interceptors.response.use(
 );
 
 export default api;
-
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  console.log('🛠 Interceptor - token:', token);
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
