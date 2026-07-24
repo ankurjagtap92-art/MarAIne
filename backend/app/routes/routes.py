@@ -165,7 +165,7 @@ def analyze_route(
         )
 
 
-@router.get("/", response_model=List[RouteAnalysisResponse])
+@router.get("", response_model=List[RouteAnalysisResponse])
 def list_routes(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -212,8 +212,7 @@ def list_routes(
 
     except Exception as e:
         print(f"❌ Error listing routes for user {current_user.id}: {e}")
-        # Return empty list instead of throwing 500
-        return []
+        return []   # Always return empty list on error
 
 
 @router.get("/{route_id}", response_model=RouteAnalysisResponse)
