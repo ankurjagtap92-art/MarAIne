@@ -136,8 +136,8 @@ def analyze_route(
         response = RouteAnalysisResponse(
             id=analysis.id,
             vessel_id=analysis.vessel_id,
-            origin_port=origin_port.name,      # <-- string, not Port object
-            destination_port=dest_port.name,   # <-- string
+            origin_port=origin_port.name,
+            destination_port=dest_port.name,
             priority=analysis.priority,
             departure_date=analysis.departure_date,
             max_acceptable_risk=analysis.max_acceptable_risk,
@@ -172,7 +172,7 @@ def list_routes(
 ):
     """
     Get all route analyses for the current user.
-    Returns an empty list if none exist.
+    Returns an empty list if none exist or if any error occurs.
     """
     try:
         routes = db.query(RouteAnalysis).filter(
@@ -181,41 +181,40 @@ def list_routes(
 
         result = []
         for route in routes:
-            # Fetch port names safely
-            origin_port = db.query(Port).filter(Port.id == route.origin_port_id).first()
-            dest_port = db.query(Port).filter(Port.id == route.destination_port_id).first()
+            try:
+                origin_port = db.query(Port).filter(Port.id == route.origin_port_id).first()
+                dest_port = db.query(Port).filter(Port.id == route.destination_port_id).first()
 
-            # Build response manually
-            response = RouteAnalysisResponse(
-                id=route.id,
-                vessel_id=route.vessel_id,
-                origin_port=origin_port.name if origin_port else "Unknown",
-                destination_port=dest_port.name if dest_port else "Unknown",
-                priority=route.priority,
-                departure_date=route.departure_date,
-                max_acceptable_risk=route.max_acceptable_risk,
-                max_deviation_percent=route.max_deviation_percent,
-                total_options_generated=route.total_options_generated,
-                recommended_option_id=route.recommended_option_id,
-                ai_explanation=route.ai_explanation,
-                ai_model_used=route.ai_model_used,
-                status=route.status,
-                created_at=route.created_at,
-                completed_at=route.completed_at,
-                options=[]   # we don't need options in the list view
-            )
-            result.append(response)
+                response = RouteAnalysisResponse(
+                    id=route.id,
+                    vessel_id=route.vessel_id,
+                    origin_port=origin_port.name if origin_port else "Unknown",
+                    destination_port=dest_port.name if dest_port else "Unknown",
+                    priority=getattr(route, "priority", "balanced"),
+                    departure_date=getattr(route, "departure_date", None),
+                    max_acceptable_risk=getattr(route, "max_acceptable_risk", None),
+                    max_deviation_percent=getattr(route, "max_deviation_percent", None),
+                    total_options_generated=getattr(route, "total_options_generated", None),
+                    recommended_option_id=getattr(route, "recommended_option_id", None),
+                    ai_explanation=getattr(route, "ai_explanation", None),
+                    ai_model_used=getattr(route, "ai_model_used", None),
+                    status=getattr(route, "status", "unknown"),
+                    created_at=route.created_at,
+                    completed_at=getattr(route, "completed_at", None),
+                    options=[]
+                )
+                result.append(response)
+            except Exception as record_error:
+                print(f"⚠️ Skipping route {route.id}: {record_error}")
+                continue
 
         return result
 
     except Exception as e:
-        # Log the error for debugging (print or use logger)
         print(f"❌ Error listing routes for user {current_user.id}: {e}")
-        # Re-raise a clean HTTP 500 with a generic message
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to load routes. Please try again later."
-        )
+        # Return empty list instead of throwing 500
+        return []
+
 
 @router.get("/{route_id}", response_model=RouteAnalysisResponse)
 def get_route(
