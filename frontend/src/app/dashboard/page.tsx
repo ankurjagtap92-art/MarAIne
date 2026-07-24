@@ -1,4 +1,4 @@
-"use client";  // ✅ YE LINE DAALO
+"use client";
 
 import dynamic from "next/dynamic";
 
