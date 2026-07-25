@@ -134,16 +134,16 @@ function greatCircleInterpolate(
   return waypoints;
 }
 
-// ✅ IMPROVED: curved route generator
+// ✅ IMPROVED FALLBACK: creates a smooth curve with perpendicular offset
 function generateSeaRouteWaypoints(
   originName: string,
   destName: string,
-  numPointsPerSegment: number = 4
+  numPointsPerSegment: number = 6
 ) {
   const originCoords = getCoords(originName);
   const destCoords = getCoords(destName);
   
-  // 1. Check predefined corridors
+  // 1. Predefined corridors
   const corridor = getSeaCorridor(originName, destName);
   if (corridor) {
     let allWps: { lat: number; lon: number }[] = [];
@@ -161,27 +161,26 @@ function generateSeaRouteWaypoints(
     }));
   }
 
-  // 2. Fallback: create a beautiful curve using a perpendicular offset
+  // 2. Fallback: create a curved route using a perpendicular offset
   const midLat = (originCoords.lat + destCoords.lat) / 2;
   const midLon = (originCoords.lon + destCoords.lon) / 2;
 
-  // Compute bearing from origin to dest
   const dLon = destCoords.lon - originCoords.lon;
   const dLat = destCoords.lat - originCoords.lat;
   const bearing = Math.atan2(dLon, dLat) * 180 / Math.PI;
 
-  // Perpendicular bearing (add 90° to push the route into the ocean)
-  // For most Indian routes, adding 90° pushes east (into the Bay of Bengal / Arabian Sea)
+  // Perpendicular offset (push route into the ocean)
   const perpBearing = bearing + 90;
-  const offsetDegrees = 6.0; // bigger offset = more curve
+  const offsetDegrees = 8.0; // bigger = more curve
 
-  const offsetLat = midLat + offsetDegrees * Math.cos(perpBearing * Math.PI / 180);
-  const offsetLon = midLon + offsetDegrees * Math.sin(perpBearing * Math.PI / 180);
-  const midPoint = { lat: offsetLat, lon: offsetLon };
+  const midPoint = { 
+    lat: midLat + offsetDegrees * Math.cos(perpBearing * Math.PI / 180),
+    lon: midLon + offsetDegrees * Math.sin(perpBearing * Math.PI / 180)
+  };
 
-  // Generate waypoints from origin -> midPoint -> dest
-  const wps1 = greatCircleInterpolate(originCoords, midPoint, 5);
-  const wps2 = greatCircleInterpolate(midPoint, destCoords, 5);
+  // Generate waypoints from origin -> midPoint -> dest with more points for smoothness
+  const wps1 = greatCircleInterpolate(originCoords, midPoint, 8);
+  const wps2 = greatCircleInterpolate(midPoint, destCoords, 8);
   const combined = [...wps1, ...wps2.slice(1)];
 
   return combined.map((p, idx) => ({
