@@ -17,7 +17,7 @@ import {
   IconSearch,
 } from "@/components/ui/icons";
 
-// ✅ Dynamically import Map with no SSR (prevents Leaflet crashes)
+// ✅ Dynamically import Map with no SSR
 const MapComponent = dynamic(() => import("@/components/Map"), {
   ssr: false,
   loading: () => (
@@ -30,26 +30,20 @@ const MapComponent = dynamic(() => import("@/components/Map"), {
   ),
 });
 
-// ============================================
-// DASHBOARD COMPONENT
-// ============================================
 export default function DashboardContent() {
   const pathname = usePathname();
   const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [weatherData, setWeatherData] = useState<{
-    [key: string]: { temp: number; condition: string };
-  }>({});
+  const [weatherData, setWeatherData] = useState<{ [key: string]: { temp: number; condition: string } }>({});
   const [weatherLoading, setWeatherLoading] = useState(true);
 
-  // ✅ MOCK USER – no Auth dependency
+  // ✅ Mock user
   const user = {
     full_name: "Smith Kennedy",
     role: "OPERATOR",
   };
 
-  // ✅ Logout handler – clears storage and redirects
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
@@ -65,7 +59,7 @@ export default function DashboardContent() {
     }
   };
 
-  // ✅ Fetch weather for Mumbai & Singapore
+  // ✅ Fetch weather
   useEffect(() => {
     const fetchWeather = async () => {
       const apiKey = process.env.NEXT_PUBLIC_OPENWEATHERMAP_API_KEY || "";
@@ -87,7 +81,6 @@ export default function DashboardContent() {
         }
         setWeatherData(results);
       } catch {
-        // Fallback data
         setWeatherData({
           Mumbai: { temp: 28, condition: "Partly Cloudy" },
           Singapore: { temp: 31, condition: "Thunderstorm" },
@@ -124,7 +117,6 @@ export default function DashboardContent() {
   const totalFleet = fleetTypes.reduce((sum, t) => sum + t.value, 0);
   const fleetHealth = 68;
 
-  // ✅ Hardcoded ports and route for the map
   const mapPorts = [
     { id: "1", name: "Mumbai", unlocode: "INBOM", latitude: 19.0760, longitude: 72.8777 },
     { id: "2", name: "Singapore", unlocode: "SGSIN", latitude: 1.3521, longitude: 103.8198 },
@@ -158,9 +150,6 @@ export default function DashboardContent() {
     { id: 2, text: "Fuel price updated", time: "1h ago" },
   ];
 
-  // ============================================
-  // RENDER
-  // ============================================
   return (
     <div className="flex min-h-screen bg-[#060b1a]">
       {/* SIDEBAR */}
@@ -190,10 +179,10 @@ export default function DashboardContent() {
             const Icon = item.icon;
             const isActive = pathname === item.href;
             return (
-              <Link
+              <div
                 key={item.href}
-                href={item.href}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
+                onClick={() => router.push(item.href)}
+                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all cursor-pointer ${
                   isActive
                     ? "bg-[#7c5cff]/10 text-[#7c5cff] shadow-[0_0_20px_rgba(124,92,255,0.1)]"
                     : "text-ink-secondary hover:bg-white/5 hover:text-ink-primary"
@@ -201,7 +190,7 @@ export default function DashboardContent() {
               >
                 <Icon className="h-5 w-5" />
                 {item.label}
-              </Link>
+              </div>
             );
           })}
         </nav>
@@ -226,9 +215,9 @@ export default function DashboardContent() {
         </div>
       </aside>
 
-      {/* MAIN CONTENT */}
+      {/* MAIN CONTENT – unchanged */}
       <main className={`flex-1 ${isSidebarOpen ? "lg:ml-64" : "ml-0"} transition-margin duration-300`}>
-        {/* TOP BAR */}
+        {/* Top Bar */}
         <header className="sticky top-0 z-40 border-b border-white/5 bg-[#0a1628]/80 backdrop-blur-xl px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
@@ -279,9 +268,8 @@ export default function DashboardContent() {
           </div>
         </header>
 
-        {/* DASHBOARD BODY */}
+        {/* DASHBOARD BODY – same as before, but I'll keep it concise */}
         <div className="p-6">
-          {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="text-xl font-bold text-ink-primary">Fleet Overview</h1>
@@ -292,7 +280,6 @@ export default function DashboardContent() {
             </Button>
           </div>
 
-          {/* Stats Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             <StatCard
               icon={<IconRoute className="h-5 w-5" />}
@@ -317,7 +304,6 @@ export default function DashboardContent() {
             />
           </div>
 
-          {/* Map + Weather */}
           <div className="mb-6">
             <GlassCard flat className="p-4 relative">
               <div className="flex justify-between items-center mb-3">
@@ -325,10 +311,7 @@ export default function DashboardContent() {
                 <div className="flex gap-4 text-xs">
                   {!weatherLoading ? (
                     Object.entries(weatherData).map(([city, data]) => (
-                      <div
-                        key={city}
-                        className="flex items-center gap-2 bg-white/5 px-3 py-1 rounded-full border border-white/10"
-                      >
+                      <div key={city} className="flex items-center gap-2 bg-white/5 px-3 py-1 rounded-full border border-white/10">
                         <span className="text-gray-400">{city}</span>
                         <span className="text-cyan-300 font-bold">{data.temp}°C</span>
                         <span className="text-gray-500 text-[10px]">{data.condition}</span>
@@ -346,20 +329,16 @@ export default function DashboardContent() {
             </GlassCard>
           </div>
 
-          {/* Insight */}
           <div className="mb-6">
             <GlassCard flat className="p-4 border border-cyan-400/10 bg-cyan-500/5">
               <p className="text-sm text-cyan-300 font-semibold flex items-center gap-2">
-                <span className="text-lg">💡</span>
-                Fuel efficiency improvement since last month:{" "}
-                <span className="text-white font-bold">+32%</span>
+                <span className="text-lg">💡</span> 
+                Fuel efficiency improvement since last month: <span className="text-white font-bold">+32%</span>
               </p>
             </GlassCard>
           </div>
 
-          {/* Recent Activity + Fleet */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Recent Activity */}
             <div className="lg:col-span-2">
               <GlassCard flat className="p-4">
                 <h3 className="text-sm font-semibold text-white mb-3">Recent Activity</h3>
@@ -379,9 +358,7 @@ export default function DashboardContent() {
               </GlassCard>
             </div>
 
-            {/* Fleet Health & Types */}
             <div className="space-y-4">
-              {/* Fleet Health */}
               <GlassCard flat className="p-4 flex flex-col items-center">
                 <h3 className="text-sm font-semibold text-white mb-2 self-start">Fleet Health</h3>
                 <div className="relative w-28 h-28">
@@ -394,9 +371,7 @@ export default function DashboardContent() {
                       stroke="#7c5cff"
                       strokeWidth="10"
                       fill="none"
-                      strokeDasharray={`${2 * Math.PI * 44 * (fleetHealth / 100)} ${
-                        2 * Math.PI * 44 * (1 - fleetHealth / 100)
-                      }`}
+                      strokeDasharray={`${2 * Math.PI * 44 * (fleetHealth / 100)} ${2 * Math.PI * 44 * (1 - fleetHealth / 100)}`}
                       strokeLinecap="round"
                     />
                   </svg>
@@ -408,7 +383,6 @@ export default function DashboardContent() {
                 <p className="text-[10px] text-ink-muted mt-2">Go to Settings to activate Windows.</p>
               </GlassCard>
 
-              {/* Fleet by Type */}
               <GlassCard flat className="p-4">
                 <h3 className="text-sm font-semibold text-white mb-3">Fleet by Type</h3>
                 <div className="space-y-3">
