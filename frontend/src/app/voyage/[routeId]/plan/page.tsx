@@ -20,7 +20,6 @@ const MapComponent = dynamic(() => import("@/components/Map"), {
   ),
 });
 
-// Hardcoded port coordinates (add more if needed)
 const PORT_COORDS: { [key: string]: { lat: number; lon: number } } = {
   "Mumbai": { lat: 19.0760, lon: 72.8777 },
   "Singapore": { lat: 1.3521, lon: 103.8198 },
@@ -40,10 +39,8 @@ const PORT_COORDS: { [key: string]: { lat: number; lon: number } } = {
   "Cape Town": { lat: -33.9249, lon: 18.4241 },
 };
 
-// Get coordinates for a port name (fuzzy match)
 function getCoords(portName: string) {
   if (!portName) return { lat: 20, lon: 80 };
-  // Try exact match, then partial
   const exact = PORT_COORDS[portName.trim()];
   if (exact) return exact;
   const key = Object.keys(PORT_COORDS).find(k =>
@@ -53,56 +50,43 @@ function getCoords(portName: string) {
   return key ? PORT_COORDS[key] : { lat: 20, lon: 80 };
 }
 
-// Great-circle (SLERP) waypoint generation – returns realistic curved route
 function generateGreatCircleWaypoints(
   origin: { lat: number; lon: number },
   dest: { lat: number; lon: number },
   numPoints: number = 10
 ) {
-  // Convert to radians
   const lat1 = origin.lat * Math.PI / 180;
   const lon1 = origin.lon * Math.PI / 180;
   const lat2 = dest.lat * Math.PI / 180;
   const lon2 = dest.lon * Math.PI / 180;
-
-  // Difference in longitude
   const dLon = lon2 - lon1;
-
-  // Central angle between points
   const d = Math.acos(
     Math.sin(lat1) * Math.sin(lat2) +
     Math.cos(lat1) * Math.cos(lat2) * Math.cos(dLon)
   );
-
-  // If points are very close, return a straight line
   if (d < 0.001) {
-    const waypoints = [];
+    const wps = [];
     for (let i = 0; i <= numPoints; i++) {
       const t = i / numPoints;
-      waypoints.push({
+      wps.push({
         lat: origin.lat + (dest.lat - origin.lat) * t,
         lon: origin.lon + (dest.lon - origin.lon) * t,
         sequence: i + 1,
         reason: i === 0 ? "Origin" : (i === numPoints ? "Destination" : `Waypoint ${i}`),
       });
     }
-    return waypoints;
+    return wps;
   }
-
   const waypoints = [];
   for (let i = 0; i <= numPoints; i++) {
     const t = i / numPoints;
-    // Spherical linear interpolation (SLERP)
     const A = Math.sin((1 - t) * d) / Math.sin(d);
     const B = Math.sin(t * d) / Math.sin(d);
-
     const x = A * Math.cos(lat1) * Math.cos(lon1) + B * Math.cos(lat2) * Math.cos(lon2);
     const y = A * Math.cos(lat1) * Math.sin(lon1) + B * Math.cos(lat2) * Math.sin(lon2);
     const z = A * Math.sin(lat1) + B * Math.sin(lat2);
-
-    const lat = Math.atan2(z, Math.sqrt(x*x + y*y));
+    const lat = Math.atan2(z, Math.sqrt(x * x + y * y));
     const lon = Math.atan2(y, x);
-
     waypoints.push({
       lat: lat * 180 / Math.PI,
       lon: lon * 180 / Math.PI,
@@ -135,7 +119,6 @@ export default function VoyagePlannerPage() {
         setError("");
         setUsingMock(false);
 
-        // Try API with 3s timeout
         const fetchPromise = api.get(`/api/v1/routes/${routeId}`);
         const timeoutPromise = new Promise((_, reject) => {
           timeoutId = setTimeout(() => reject(new Error("Request timed out")), 3000);
@@ -156,7 +139,6 @@ export default function VoyagePlannerPage() {
 
         setRoute(data);
 
-        // Find selected option
         let selected = null;
         if (optionId) {
           selected = data.options?.find((o: any) => o.id === optionId);
@@ -165,7 +147,6 @@ export default function VoyagePlannerPage() {
           selected = data.options[0];
         }
 
-        // If no option, create dummy with realistic route
         if (!selected) {
           setUsingMock(true);
           const origin = data.origin_port || "Mumbai";
@@ -185,7 +166,6 @@ export default function VoyagePlannerPage() {
           };
         }
 
-        // Ensure waypoints exist and are great-circle
         if (selected && (!selected.waypoints || selected.waypoints.length < 2)) {
           setUsingMock(true);
           const origin = data.origin_port || "Mumbai";
@@ -201,7 +181,6 @@ export default function VoyagePlannerPage() {
         if (isMounted) {
           setError("Could not load route. Showing demo data.");
           setUsingMock(true);
-          // Fallback to a realistic great-circle route between Mumbai and Singapore
           const origin = "Mumbai";
           const dest = "Singapore";
           const originCoords = getCoords(origin);
@@ -286,30 +265,26 @@ export default function VoyagePlannerPage() {
   const waypoints = selectedOption.waypoints || [];
   const waypointsForMap = waypoints.map((w: any) => ({ lat: w.lat, lon: w.lon }));
 
-  // Compute step-by-step directions with better distances
   const steps = waypoints.length > 1 ? waypoints.map((w: any, i: number) => {
     if (i === 0) return null;
-    const prev = waypoints[i-1];
-    // Haversine distance for accuracy
-    const R = 6371; // km
+    const prev = waypoints[i - 1];
+    const R = 6371;
     const dLat = (w.lat - prev.lat) * Math.PI / 180;
     const dLon = (w.lon - prev.lon) * Math.PI / 180;
-    const a = Math.sin(dLat/2)*Math.sin(dLat/2) +
-              Math.cos(prev.lat * Math.PI/180) * Math.cos(w.lat * Math.PI/180) *
-              Math.sin(dLon/2)*Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(prev.lat * Math.PI / 180) * Math.cos(w.lat * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const distance_km = R * c;
-    const distance_nm = distance_km / 1.852; // convert to nautical miles
-
+    const distance_nm = distance_km / 1.852;
     const bearing = Math.atan2(
-      Math.sin(dLon) * Math.cos(w.lat * Math.PI/180),
-      Math.cos(prev.lat * Math.PI/180) * Math.sin(w.lat * Math.PI/180) -
-      Math.sin(prev.lat * Math.PI/180) * Math.cos(w.lat * Math.PI/180) * Math.cos(dLon)
+      Math.sin(dLon) * Math.cos(w.lat * Math.PI / 180),
+      Math.cos(prev.lat * Math.PI / 180) * Math.sin(w.lat * Math.PI / 180) -
+      Math.sin(prev.lat * Math.PI / 180) * Math.cos(w.lat * Math.PI / 180) * Math.cos(dLon)
     ) * 180 / Math.PI;
-
     return {
       from: i === 1 ? "Origin" : `WP ${i}`,
-      to: i === waypoints.length - 1 ? "Destination" : `WP ${i+1}`,
+      to: i === waypoints.length - 1 ? "Destination" : `WP ${i + 1}`,
       distance: distance_nm.toFixed(1),
       bearing: ((bearing % 360) + 360) % 360 === 0 ? "000" : (((bearing % 360) + 360) % 360).toFixed(0),
     };
@@ -336,8 +311,15 @@ export default function VoyagePlannerPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2">
                 <GlassCard glow className="p-4 border border-white/5">
+                  {/* ✅ FIXED: pass both waypoints and routes */}
                   <MapComponent
                     waypoints={waypointsForMap}
+                    routes={[{
+                      id: 'voyage-route',
+                      origin_port: route?.origin_port || 'Origin',
+                      destination_port: route?.destination_port || 'Destination',
+                      waypoints: waypointsForMap
+                    }]}
                     height="500px"
                     center={waypointsForMap.length > 0 ? [waypointsForMap[0].lat, waypointsForMap[0].lon] : [20, 30]}
                     zoom={4}
@@ -370,7 +352,7 @@ export default function VoyagePlannerPage() {
                       {steps.map((step: any, idx: number) => (
                         <div key={idx} className="flex items-start gap-2 border-b border-white/5 pb-2 last:border-0">
                           <div className="w-6 h-6 rounded-full bg-cyan-400/20 flex items-center justify-center text-xs font-bold text-cyan-300 flex-shrink-0">
-                            {idx+1}
+                            {idx + 1}
                           </div>
                           <div>
                             <p className="text-sm text-white">{step.from} → {step.to}</p>
