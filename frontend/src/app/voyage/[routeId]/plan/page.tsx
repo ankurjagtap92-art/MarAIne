@@ -20,7 +20,6 @@ const MapComponent = dynamic(() => import("@/components/Map"), {
   ),
 });
 
-// ==================== PORT COORDINATES & HELPERS ====================
 const PORT_COORDS: { [key: string]: { lat: number; lon: number } } = {
   "Mumbai": { lat: 19.0760, lon: 72.8777 },
   "Singapore": { lat: 1.3521, lon: 103.8198 },
@@ -51,7 +50,6 @@ function getCoords(portName: string) {
   return key ? PORT_COORDS[key] : { lat: 20, lon: 80 };
 }
 
-// Sea corridors
 const SEA_CORRIDORS: Record<string, { lat: number; lon: number }[]> = {
   "Mumbai-Singapore": [
     { lat: 19.0760, lon: 72.8777 },
@@ -136,13 +134,16 @@ function greatCircleInterpolate(
   return waypoints;
 }
 
+// ✅ IMPROVED: curved route generator
 function generateSeaRouteWaypoints(
   originName: string,
   destName: string,
-  numPointsPerSegment: number = 3
+  numPointsPerSegment: number = 4
 ) {
   const originCoords = getCoords(originName);
   const destCoords = getCoords(destName);
+  
+  // 1. Check predefined corridors
   const corridor = getSeaCorridor(originName, destName);
   if (corridor) {
     let allWps: { lat: number; lon: number }[] = [];
@@ -159,12 +160,30 @@ function generateSeaRouteWaypoints(
       reason: idx === 0 ? "Origin" : (idx === allWps.length - 1 ? "Destination" : `Waypoint ${idx}`),
     }));
   }
+
+  // 2. Fallback: create a beautiful curve using a perpendicular offset
   const midLat = (originCoords.lat + destCoords.lat) / 2;
   const midLon = (originCoords.lon + destCoords.lon) / 2;
-  const seaMid = { lat: midLat, lon: midLon + 3.0 };
-  const wps = greatCircleInterpolate(originCoords, seaMid, 3);
-  const wps2 = greatCircleInterpolate(seaMid, destCoords, 3);
-  const combined = [...wps, ...wps2.slice(1)];
+
+  // Compute bearing from origin to dest
+  const dLon = destCoords.lon - originCoords.lon;
+  const dLat = destCoords.lat - originCoords.lat;
+  const bearing = Math.atan2(dLon, dLat) * 180 / Math.PI;
+
+  // Perpendicular bearing (add 90° to push the route into the ocean)
+  // For most Indian routes, adding 90° pushes east (into the Bay of Bengal / Arabian Sea)
+  const perpBearing = bearing + 90;
+  const offsetDegrees = 6.0; // bigger offset = more curve
+
+  const offsetLat = midLat + offsetDegrees * Math.cos(perpBearing * Math.PI / 180);
+  const offsetLon = midLon + offsetDegrees * Math.sin(perpBearing * Math.PI / 180);
+  const midPoint = { lat: offsetLat, lon: offsetLon };
+
+  // Generate waypoints from origin -> midPoint -> dest
+  const wps1 = greatCircleInterpolate(originCoords, midPoint, 5);
+  const wps2 = greatCircleInterpolate(midPoint, destCoords, 5);
+  const combined = [...wps1, ...wps2.slice(1)];
+
   return combined.map((p, idx) => ({
     lat: p.lat,
     lon: p.lon,
@@ -173,7 +192,6 @@ function generateSeaRouteWaypoints(
   }));
 }
 
-// ==================== MAIN COMPONENT ====================
 export default function VoyagePlannerPage() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -186,11 +204,11 @@ export default function VoyagePlannerPage() {
   const [selectedOption, setSelectedOption] = useState<any>(null);
   const [usingMock, setUsingMock] = useState(false);
 
-  // ----- Manual input state -----
+  // Manual input state
   const [manualOrigin, setManualOrigin] = useState("");
   const [manualDest, setManualDest] = useState("");
 
-  // ----- Download CSV -----
+  // Download CSV
   const downloadCoordinates = () => {
     if (!selectedOption || !selectedOption.waypoints || selectedOption.waypoints.length < 2) {
       alert("No waypoints available.");
@@ -210,7 +228,7 @@ export default function VoyagePlannerPage() {
     window.URL.revokeObjectURL(url);
   };
 
-  // ----- Generate from manual input -----
+  // Generate from manual input
   const handleManualGenerate = () => {
     if (!manualOrigin.trim() || !manualDest.trim()) {
       alert("Please enter both origin and destination ports.");
@@ -238,7 +256,7 @@ export default function VoyagePlannerPage() {
     setError("");
   };
 
-  // ----- Load from routeId (if present) -----
+  // Load from routeId
   useEffect(() => {
     let isMounted = true;
     let timeoutId: NodeJS.Timeout;
@@ -418,7 +436,7 @@ export default function VoyagePlannerPage() {
       <PageTransition>
         <div className="min-h-screen bg-[#060b1a] p-8">
           <div className="max-w-7xl mx-auto">
-            {/* ---- MANUAL INPUT PANEL ---- */}
+            {/* Manual Input Panel */}
             <GlassCard glow className="p-4 mb-6 border border-white/10">
               <h3 className="text-sm font-semibold text-white mb-3">🔍 Try Any Route</h3>
               <div className="flex flex-wrap gap-3">
@@ -439,11 +457,11 @@ export default function VoyagePlannerPage() {
                 </Button>
               </div>
               <p className="text-xs text-ink-muted mt-2">
-                Tip: Try "Mumbai → Dubai", "Chennai → Singapore", or any of the supported ports.
+                Tip: Try "Mumbai → Dubai", "Chennai → Singapore", or any supported port.
               </p>
             </GlassCard>
 
-            {/* ---- HEADER ---- */}
+            {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
               <div>
                 <h1 className="text-3xl font-bold text-white">⚓ Voyage Planner</h1>
@@ -472,7 +490,7 @@ export default function VoyagePlannerPage() {
               </div>
             </div>
 
-            {/* ---- MAP & SIDEBAR ---- */}
+            {/* Map & Sidebar */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2">
                 <GlassCard glow className="p-4 border border-white/5">
