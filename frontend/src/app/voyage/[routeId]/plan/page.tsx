@@ -20,7 +20,6 @@ const MapComponent = dynamic(() => import("@/components/Map"), {
   ),
 });
 
-// ==================== PORT COORDINATES ====================
 const PORT_COORDS: { [key: string]: { lat: number; lon: number } } = {
   "Mumbai": { lat: 19.0760, lon: 72.8777 },
   "Singapore": { lat: 1.3521, lon: 103.8198 },
@@ -51,37 +50,34 @@ function getCoords(portName: string) {
   return key ? PORT_COORDS[key] : { lat: 20, lon: 80 };
 }
 
-// ==================== SEA CORRIDOR WAYPOINTS ====================
-// Predefined sea‑faring routes to avoid land
 const SEA_CORRIDORS: Record<string, { lat: number; lon: number }[]> = {
   "Mumbai-Singapore": [
-    { lat: 19.0760, lon: 72.8777 },  // Mumbai
-    { lat: 15.0, lon: 73.0 },        // off Gujarat coast
-    { lat: 10.5, lon: 75.5 },        // off Kerala
-    { lat: 7.5, lon: 77.5 },         // south of India
-    { lat: 5.5, lon: 80.5 },         // south of Sri Lanka
-    { lat: 5.0, lon: 85.0 },         // Bay of Bengal
-    { lat: 4.5, lon: 92.0 },         // Nicobar area
-    { lat: 4.0, lon: 98.0 },         // Malacca entrance
-    { lat: 1.3521, lon: 103.8198 },  // Singapore
+    { lat: 19.0760, lon: 72.8777 },
+    { lat: 15.0, lon: 73.0 },
+    { lat: 10.5, lon: 75.5 },
+    { lat: 7.5, lon: 77.5 },
+    { lat: 5.5, lon: 80.5 },
+    { lat: 5.0, lon: 85.0 },
+    { lat: 4.5, lon: 92.0 },
+    { lat: 4.0, lon: 98.0 },
+    { lat: 1.3521, lon: 103.8198 },
   ],
   "Chennai-Singapore": [
-    { lat: 13.0827, lon: 80.2707 },  // Chennai
-    { lat: 10.5, lon: 80.5 },        // off TN coast
-    { lat: 7.5, lon: 81.0 },         // south of Sri Lanka
-    { lat: 5.5, lon: 85.0 },         // Bay of Bengal
-    { lat: 4.5, lon: 92.0 },         // Nicobar
-    { lat: 4.0, lon: 98.0 },         // Malacca
-    { lat: 1.3521, lon: 103.8198 },  // Singapore
+    { lat: 13.0827, lon: 80.2707 },
+    { lat: 10.5, lon: 80.5 },
+    { lat: 7.5, lon: 81.0 },
+    { lat: 5.5, lon: 85.0 },
+    { lat: 4.5, lon: 92.0 },
+    { lat: 4.0, lon: 98.0 },
+    { lat: 1.3521, lon: 103.8198 },
   ],
   "Mumbai-Dubai": [
-    { lat: 19.0760, lon: 72.8777 },  // Mumbai
-    { lat: 20.0, lon: 68.0 },        // off Gujarat
-    { lat: 22.0, lon: 62.0 },        // Arabian Sea
-    { lat: 24.0, lon: 58.0 },        // near Oman
-    { lat: 25.2048, lon: 55.2708 },  // Dubai
+    { lat: 19.0760, lon: 72.8777 },
+    { lat: 20.0, lon: 68.0 },
+    { lat: 22.0, lon: 62.0 },
+    { lat: 24.0, lon: 58.0 },
+    { lat: 25.2048, lon: 55.2708 },
   ],
-  // Add more as needed
 };
 
 function getSeaCorridor(origin: string, dest: string) {
@@ -89,14 +85,12 @@ function getSeaCorridor(origin: string, dest: string) {
   const key2 = `${dest}-${origin}`;
   let corridor = SEA_CORRIDORS[key1] || SEA_CORRIDORS[key2];
   if (corridor) {
-    // If we have the reverse, reverse the waypoints
     if (SEA_CORRIDORS[key2]) corridor = [...corridor].reverse();
     return corridor;
   }
   return null;
 }
 
-// ==================== GREAT-CIRCLE HELPER ====================
 function greatCircleInterpolate(
   origin: { lat: number; lon: number },
   dest: { lat: number; lon: number },
@@ -140,7 +134,6 @@ function greatCircleInterpolate(
   return waypoints;
 }
 
-// ==================== MAIN GENERATOR ====================
 function generateSeaRouteWaypoints(
   originName: string,
   destName: string,
@@ -148,20 +141,15 @@ function generateSeaRouteWaypoints(
 ) {
   const originCoords = getCoords(originName);
   const destCoords = getCoords(destName);
-
-  // 1. Check if we have a predefined sea corridor
   const corridor = getSeaCorridor(originName, destName);
   if (corridor) {
-    // Interpolate between each consecutive pair in the corridor
     let allWps: { lat: number; lon: number }[] = [];
     for (let i = 0; i < corridor.length - 1; i++) {
       const seg = greatCircleInterpolate(corridor[i], corridor[i+1], numPointsPerSegment);
       if (i === 0) allWps = allWps.concat(seg);
-      else allWps = allWps.concat(seg.slice(1)); // avoid duplicate points
+      else allWps = allWps.concat(seg.slice(1));
     }
-    // Ensure we have at least 2 points
     if (allWps.length < 2) allWps = [originCoords, destCoords];
-    // Add sequence and reason
     return allWps.map((p, idx) => ({
       lat: p.lat,
       lon: p.lon,
@@ -169,13 +157,9 @@ function generateSeaRouteWaypoints(
       reason: idx === 0 ? "Origin" : (idx === allWps.length - 1 ? "Destination" : `Waypoint ${idx}`),
     }));
   }
-
-  // 2. Fallback: great‑circle but with a slight offset to avoid obvious land (shift the midpoint)
-  // We'll shift the midpoint towards the sea by adding a delta
   const midLat = (originCoords.lat + destCoords.lat) / 2;
   const midLon = (originCoords.lon + destCoords.lon) / 2;
-  // For Indian routes, shift towards the sea (e.g., add 5° east for eastbound)
-  const seaMid = { lat: midLat, lon: midLon + 3.0 }; // crude offset
+  const seaMid = { lat: midLat, lon: midLon + 3.0 };
   const wps = greatCircleInterpolate(originCoords, seaMid, 3);
   const wps2 = greatCircleInterpolate(seaMid, destCoords, 3);
   const combined = [...wps, ...wps2.slice(1)];
@@ -187,7 +171,6 @@ function generateSeaRouteWaypoints(
   }));
 }
 
-// ==================== COMPONENT ====================
 export default function VoyagePlannerPage() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -199,6 +182,30 @@ export default function VoyagePlannerPage() {
   const [route, setRoute] = useState<any>(null);
   const [selectedOption, setSelectedOption] = useState<any>(null);
   const [usingMock, setUsingMock] = useState(false);
+
+  // ✅ Google Maps function
+  const openGoogleMaps = () => {
+    if (!selectedOption || !selectedOption.waypoints || selectedOption.waypoints.length < 2) {
+      alert("No waypoints available to show on map.");
+      return;
+    }
+
+    const waypoints = selectedOption.waypoints;
+    const origin = waypoints[0];
+    const destination = waypoints[waypoints.length - 1];
+    
+    let url = "https://www.google.com/maps/dir/?api=1";
+    url += `&origin=${origin.lat},${origin.lon}`;
+    url += `&destination=${destination.lat},${destination.lon}`;
+    
+    if (waypoints.length > 2) {
+      const middleWps = waypoints.slice(1, -1);
+      const waypointsStr = middleWps.map(w => `${w.lat},${w.lon}`).join("|");
+      url += `&waypoints=${waypointsStr}`;
+    }
+    
+    window.open(url, "_blank");
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -237,7 +244,6 @@ export default function VoyagePlannerPage() {
           selected = data.options[0];
         }
 
-        // If no option, create one with sea‑route waypoints
         if (!selected) {
           setUsingMock(true);
           const origin = data.origin_port || "Mumbai";
@@ -255,7 +261,6 @@ export default function VoyagePlannerPage() {
           };
         }
 
-        // Ensure waypoints exist and use sea route
         if (selected && (!selected.waypoints || selected.waypoints.length < 2)) {
           setUsingMock(true);
           const origin = data.origin_port || "Mumbai";
@@ -351,7 +356,6 @@ export default function VoyagePlannerPage() {
   const waypoints = selectedOption.waypoints || [];
   const waypointsForMap = waypoints.map((w: any) => ({ lat: w.lat, lon: w.lon }));
 
-  // Compute directions using Haversine
   const steps = waypoints.length > 1 ? waypoints.map((w: any, i: number) => {
     if (i === 0) return null;
     const prev = waypoints[i-1];
@@ -390,9 +394,23 @@ export default function VoyagePlannerPage() {
                   {usingMock && <span className="ml-2 text-yellow-400 text-xs">(demo data)</span>}
                 </p>
               </div>
-              <Button variant="outline" onClick={() => window.history.back()}>
-                ← Back to Route
-              </Button>
+              <div className="flex gap-2">
+                {/* ✅ Google Maps Button */}
+                <Button 
+                  variant="primary" 
+                  size="sm" 
+                  onClick={openGoogleMaps}
+                  className="flex items-center gap-2"
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                  </svg>
+                  Google Maps
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => window.history.back()}>
+                  ← Back
+                </Button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
