@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PageTransition from "@/components/PageTransition";
-import { GlassCard, Button } from "@/components/ui";
+import { GlassCard, Button, Input } from "@/components/ui";
 import dynamic from "next/dynamic";
 import api from "@/lib/api";
 
@@ -20,6 +20,7 @@ const MapComponent = dynamic(() => import("@/components/Map"), {
   ),
 });
 
+// ==================== PORT COORDINATES & HELPERS ====================
 const PORT_COORDS: { [key: string]: { lat: number; lon: number } } = {
   "Mumbai": { lat: 19.0760, lon: 72.8777 },
   "Singapore": { lat: 1.3521, lon: 103.8198 },
@@ -50,6 +51,7 @@ function getCoords(portName: string) {
   return key ? PORT_COORDS[key] : { lat: 20, lon: 80 };
 }
 
+// Sea corridors
 const SEA_CORRIDORS: Record<string, { lat: number; lon: number }[]> = {
   "Mumbai-Singapore": [
     { lat: 19.0760, lon: 72.8777 },
@@ -171,6 +173,7 @@ function generateSeaRouteWaypoints(
   }));
 }
 
+// ==================== MAIN COMPONENT ====================
 export default function VoyagePlannerPage() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -183,7 +186,11 @@ export default function VoyagePlannerPage() {
   const [selectedOption, setSelectedOption] = useState<any>(null);
   const [usingMock, setUsingMock] = useState(false);
 
-  // ✅ Download CSV coordinates
+  // ----- Manual input state -----
+  const [manualOrigin, setManualOrigin] = useState("");
+  const [manualDest, setManualDest] = useState("");
+
+  // ----- Download CSV -----
   const downloadCoordinates = () => {
     if (!selectedOption || !selectedOption.waypoints || selectedOption.waypoints.length < 2) {
       alert("No waypoints available.");
@@ -203,6 +210,35 @@ export default function VoyagePlannerPage() {
     window.URL.revokeObjectURL(url);
   };
 
+  // ----- Generate from manual input -----
+  const handleManualGenerate = () => {
+    if (!manualOrigin.trim() || !manualDest.trim()) {
+      alert("Please enter both origin and destination ports.");
+      return;
+    }
+    const origin = manualOrigin.trim();
+    const dest = manualDest.trim();
+    const waypoints = generateSeaRouteWaypoints(origin, dest, 4);
+    if (waypoints.length < 2) {
+      alert("Could not generate route. Please check port names.");
+      return;
+    }
+    setUsingMock(true);
+    setRoute({ origin_port: origin, destination_port: dest, priority: "manual" });
+    setSelectedOption({
+      id: "manual-" + Date.now(),
+      route_type: "manual",
+      total_distance_nm: 1500,
+      estimated_duration_hours: 90,
+      total_fuel_tons: 30,
+      fuel_cost_usd: 18000,
+      weather_risk_score: 15,
+      waypoints: waypoints,
+    });
+    setError("");
+  };
+
+  // ----- Load from routeId (if present) -----
   useEffect(() => {
     let isMounted = true;
     let timeoutId: NodeJS.Timeout;
@@ -382,6 +418,32 @@ export default function VoyagePlannerPage() {
       <PageTransition>
         <div className="min-h-screen bg-[#060b1a] p-8">
           <div className="max-w-7xl mx-auto">
+            {/* ---- MANUAL INPUT PANEL ---- */}
+            <GlassCard glow className="p-4 mb-6 border border-white/10">
+              <h3 className="text-sm font-semibold text-white mb-3">🔍 Try Any Route</h3>
+              <div className="flex flex-wrap gap-3">
+                <Input
+                  placeholder="Origin port (e.g., Mumbai, Chennai, Dubai)"
+                  value={manualOrigin}
+                  onChange={(e) => setManualOrigin(e.target.value)}
+                  className="flex-1 min-w-[180px]"
+                />
+                <Input
+                  placeholder="Destination port (e.g., Singapore, London, Shanghai)"
+                  value={manualDest}
+                  onChange={(e) => setManualDest(e.target.value)}
+                  className="flex-1 min-w-[180px]"
+                />
+                <Button variant="primary" size="sm" onClick={handleManualGenerate}>
+                  Generate Route
+                </Button>
+              </div>
+              <p className="text-xs text-ink-muted mt-2">
+                Tip: Try "Mumbai → Dubai", "Chennai → Singapore", or any of the supported ports.
+              </p>
+            </GlassCard>
+
+            {/* ---- HEADER ---- */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
               <div>
                 <h1 className="text-3xl font-bold text-white">⚓ Voyage Planner</h1>
@@ -391,7 +453,6 @@ export default function VoyagePlannerPage() {
                 </p>
               </div>
               <div className="flex gap-2">
-                {/* ✅ Download Coordinates Button */}
                 <Button 
                   variant="primary" 
                   size="sm" 
@@ -411,6 +472,7 @@ export default function VoyagePlannerPage() {
               </div>
             </div>
 
+            {/* ---- MAP & SIDEBAR ---- */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2">
                 <GlassCard glow className="p-4 border border-white/5">
