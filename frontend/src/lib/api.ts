@@ -38,4 +38,9 @@ api.interceptors.response.use(
   }
 );
 
+
+if (!process.env.NEXT_PUBLIC_API_URL) {
+  console.warn("NEXT_PUBLIC_API_URL not set – using localhost fallback.");
+}
+
 export default api;
