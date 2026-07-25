@@ -16,7 +16,6 @@ interface RouteOption {
   fuel_cost_usd: number;
   weather_risk_score: number;
   is_recommended: boolean;
-  // Add more if needed
 }
 
 interface RouteResult {
@@ -59,10 +58,10 @@ export default function RouteResultPage() {
   }, [routeId]);
 
   const handleSelectRoute = (optionId: string) => {
-  setSelectedOption(optionId);
-  // ✅ Redirect to voyage planner (your friend will build this page)
-  router.push(`/voyage/${routeId}/plan`);
-};
+    setSelectedOption(optionId);
+    // ✅ Pass the selected option ID as a query parameter
+    router.push(`/voyage/${routeId}/plan?optionId=${optionId}`);
+  };
 
   if (loading) {
     return (
@@ -107,7 +106,6 @@ export default function RouteResultPage() {
                 <Badge variant="info">{route.priority.toUpperCase()}</Badge>
               </div>
 
-              {/* AI Explanation */}
               {route.ai_explanation && (
                 <div className="mb-6 p-4 bg-cyan-400/5 border border-cyan-400/20 rounded-lg">
                   <p className="text-sm text-cyan-300 font-semibold mb-1">🤖 AI Analysis</p>

@@ -13,30 +13,22 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
 });
 
-interface Port {
-  id: string;
-  name: string;
-  unlocode: string;
-  latitude: number;
-  longitude: number;
-}
-
-interface Route {
-  id: string;
-  origin_port: string;
-  destination_port: string;
-  waypoints?: { lat: number; lon: number }[];
+interface Waypoint {
+  lat: number;
+  lon: number;
+  label?: string; // optional label
 }
 
 interface MapProps {
-  ports?: Port[];
-  routes?: Route[];
+  ports?: any[];
+  routes?: any[];
+  waypoints?: Waypoint[]; // <-- new prop for waypoints
   height?: string;
   center?: [number, number];
   zoom?: number;
 }
 
-// Component to fit map bounds to markers
+// Component to fit bounds to given positions
 function FitBounds({ positions }: { positions: [number, number][] }) {
   const map = useMap();
   useEffect(() => {
@@ -48,19 +40,22 @@ function FitBounds({ positions }: { positions: [number, number][] }) {
   return null;
 }
 
-export default function Map({ ports = [], routes = [], height = "320px", center = [20, 30], zoom = 3 }: MapProps) {
+export default function Map({ ports = [], routes = [], waypoints = [], height = "320px", center = [20, 30], zoom = 3 }: MapProps) {
   const [isClient, setIsClient] = useState(false);
-  const [markerPositions, setMarkerPositions] = useState<[number, number][]>([]);
+  const [allPositions, setAllPositions] = useState<[number, number][]>([]);
 
   useEffect(() => {
     setIsClient(true);
-    const positions = ports.map(p => [p.latitude, p.longitude] as [number, number]);
-    setMarkerPositions(positions);
-  }, [ports]);
+    // Collect positions from ports and waypoints
+    const pos: [number, number][] = [];
+    ports.forEach(p => pos.push([p.latitude, p.longitude]));
+    waypoints.forEach(w => pos.push([w.lat, w.lon]));
+    setAllPositions(pos);
+  }, [ports, waypoints]);
 
   if (!isClient) {
     return (
-      <div 
+      <div
         className="bg-[#0d2137]/50 backdrop-blur-sm border border-white/5 rounded-xl flex items-center justify-center"
         style={{ height }}
       >
@@ -68,6 +63,9 @@ export default function Map({ ports = [], routes = [], height = "320px", center 
       </div>
     );
   }
+
+  // Build polyline positions from waypoints
+  const polylinePositions = waypoints.map(w => [w.lat, w.lon] as [number, number]);
 
   return (
     <div className="rounded-xl overflow-hidden border border-white/5" style={{ height }}>
@@ -97,10 +95,10 @@ export default function Map({ ports = [], routes = [], height = "320px", center 
           </Marker>
         ))}
 
-        {/* Route Lines */}
+        {/* Route Lines (if routes prop is provided) */}
         {routes.map((route) => {
           if (!route.waypoints || route.waypoints.length < 2) return null;
-          const positions = route.waypoints.map(w => [w.lat, w.lon] as [number, number]);
+          const positions = route.waypoints.map((w: any) => [w.lat, w.lon] as [number, number]);
           return (
             <Polyline
               key={route.id}
@@ -113,8 +111,41 @@ export default function Map({ ports = [], routes = [], height = "320px", center 
           );
         })}
 
-        {/* Fit bounds */}
-        {markerPositions.length > 0 && <FitBounds positions={markerPositions} />}
+        {/* Waypoints polyline (from waypoints prop) */}
+        {polylinePositions.length > 1 && (
+          <Polyline
+            positions={polylinePositions}
+            color="#7c5cff"
+            weight={4}
+            opacity={0.9}
+          />
+        )}
+
+        {/* Waypoint Markers with sequence number as label */}
+        {waypoints.map((w, idx) => (
+          <Marker
+            key={idx}
+            position={[w.lat, w.lon]}
+            icon={L.divIcon({
+              className: "bg-cyan-400 text-black font-bold rounded-full w-6 h-6 flex items-center justify-center text-xs border-2 border-white",
+              html: `${idx + 1}`,
+              iconSize: [24, 24],
+              iconAnchor: [12, 12],
+            })}
+          >
+            <Popup>
+              <div className="text-white bg-[#0a1628] p-2 rounded-lg">
+                <p className="font-semibold">{w.label || `Waypoint ${idx+1}`}</p>
+                <p className="text-xs text-gray-400">
+                  {w.lat.toFixed(4)}, {w.lon.toFixed(4)}
+                </p>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+
+        {/* Fit bounds if we have positions */}
+        {allPositions.length > 0 && <FitBounds positions={allPositions} />}
       </MapContainer>
     </div>
   );
