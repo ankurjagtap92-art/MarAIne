@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
 import axios from "axios";
 
@@ -17,7 +17,6 @@ import {
   IconSearch,
 } from "@/components/ui/icons";
 
-// ✅ Dynamically import Map with no SSR
 const MapComponent = dynamic(() => import("@/components/Map"), {
   ssr: false,
   loading: () => (
@@ -32,13 +31,11 @@ const MapComponent = dynamic(() => import("@/components/Map"), {
 
 export default function DashboardContent() {
   const pathname = usePathname();
-  const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [showNotifications, setShowNotifications] = useState(false);
   const [weatherData, setWeatherData] = useState<{ [key: string]: { temp: number; condition: string } }>({});
   const [weatherLoading, setWeatherLoading] = useState(true);
 
-  // ✅ Mock user
   const user = {
     full_name: "Smith Kennedy",
     role: "OPERATOR",
@@ -47,7 +44,7 @@ export default function DashboardContent() {
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
-    router.push("/login");
+    window.location.href = "/login";
   };
 
   const handleShare = async () => {
@@ -59,7 +56,6 @@ export default function DashboardContent() {
     }
   };
 
-  // ✅ Fetch weather
   useEffect(() => {
     const fetchWeather = async () => {
       const apiKey = process.env.NEXT_PUBLIC_OPENWEATHERMAP_API_KEY || "";
@@ -92,9 +88,6 @@ export default function DashboardContent() {
     fetchWeather();
   }, []);
 
-  // ============================================
-  // STATIC DATA (matches Screenshot 507)
-  // ============================================
   const stats = {
     totalRoutes: 14,
     fuelSaved: 0,
@@ -175,14 +168,15 @@ export default function DashboardContent() {
 
         <nav className="px-4 py-6 space-y-1">
           <p className="px-3 text-[11px] uppercase tracking-wider text-ink-muted">Main</p>
+          {/* ✅ REPLACED div with a tags */}
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
             return (
-              <div
+              <a
                 key={item.href}
-                onClick={() => router.push(item.href)}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all cursor-pointer ${
+                href={item.href}
+                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all cursor-pointer no-underline ${
                   isActive
                     ? "bg-[#7c5cff]/10 text-[#7c5cff] shadow-[0_0_20px_rgba(124,92,255,0.1)]"
                     : "text-ink-secondary hover:bg-white/5 hover:text-ink-primary"
@@ -190,7 +184,7 @@ export default function DashboardContent() {
               >
                 <Icon className="h-5 w-5" />
                 {item.label}
-              </div>
+              </a>
             );
           })}
         </nav>
@@ -217,7 +211,6 @@ export default function DashboardContent() {
 
       {/* MAIN CONTENT – unchanged */}
       <main className={`flex-1 ${isSidebarOpen ? "lg:ml-64" : "ml-0"} transition-margin duration-300`}>
-        {/* Top Bar */}
         <header className="sticky top-0 z-40 border-b border-white/5 bg-[#0a1628]/80 backdrop-blur-xl px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
@@ -268,7 +261,7 @@ export default function DashboardContent() {
           </div>
         </header>
 
-        {/* DASHBOARD BODY – same as before, but I'll keep it concise */}
+        {/* Dashboard Body – unchanged */}
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
             <div>
