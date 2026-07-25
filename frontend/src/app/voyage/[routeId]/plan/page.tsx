@@ -183,29 +183,20 @@ export default function VoyagePlannerPage() {
   const [selectedOption, setSelectedOption] = useState<any>(null);
   const [usingMock, setUsingMock] = useState(false);
 
-  // ✅ Google Maps function
-  const openGoogleMaps = () => {
-    if (!selectedOption || !selectedOption.waypoints || selectedOption.waypoints.length < 2) {
-      alert("No waypoints available to show on map.");
-      return;
-    }
+  // ✅ Maps function coordinates
+const openGoogleMaps = () => {
+  if (!selectedOption || !selectedOption.waypoints || selectedOption.waypoints.length < 2) {
+    alert("No waypoints available.");
+    return;
+  }
 
-    const waypoints = selectedOption.waypoints;
-    const origin = waypoints[0];
-    const destination = waypoints[waypoints.length - 1];
-    
-    let url = "https://www.google.com/maps/dir/?api=1";
-    url += `&origin=${origin.lat},${origin.lon}`;
-    url += `&destination=${destination.lat},${destination.lon}`;
-    
-    if (waypoints.length > 2) {
-      const middleWps = waypoints.slice(1, -1);
-      const waypointsStr = middleWps.map(w => `${w.lat},${w.lon}`).join("|");
-      url += `&waypoints=${waypointsStr}`;
-    }
-    
-    window.open(url, "_blank");
-  };
+  const waypoints = selectedOption.waypoints;
+  // Build a search query with all coordinates: "lat,lon lat,lon lat,lon ..."
+  const coordsStr = waypoints.map(w => `${w.lat},${w.lon}`).join('+');
+  // Use Google Maps search URL – it shows all as markers
+  const url = `https://www.google.com/maps/search/${coordsStr}`;
+  window.open(url, "_blank");
+};
 
   useEffect(() => {
     let isMounted = true;
