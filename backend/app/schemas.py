@@ -139,11 +139,13 @@ class RouteOptionBase(BaseModel):
 class RouteOptionCreate(RouteOptionBase):
     pass
 
+# In backend/app/schemas.py, add this field to RouteOptionResponse:
 class RouteOptionResponse(RouteOptionBase):
     id: UUID
     analysis_id: UUID
     is_recommended: bool
     created_at: datetime
+    waypoints: List[WaypointResponse] = []   # <-- ADD THIS LINE
 
     class Config:
         from_attributes = True
