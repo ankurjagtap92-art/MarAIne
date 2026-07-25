@@ -16,19 +16,34 @@ L.Icon.Default.mergeOptions({
 interface Waypoint {
   lat: number;
   lon: number;
-  label?: string; // optional label
+  label?: string;
+}
+
+interface Port {
+  id: string;
+  name: string;
+  unlocode: string;
+  latitude: number;
+  longitude: number;
+}
+
+interface Route {
+  id: string;
+  origin_port: string;
+  destination_port: string;
+  waypoints?: { lat: number; lon: number }[];
 }
 
 interface MapProps {
-  ports?: any[];
-  routes?: any[];
-  waypoints?: Waypoint[]; // <-- new prop for waypoints
+  ports?: Port[];
+  routes?: Route[];
+  waypoints?: Waypoint[];
   height?: string;
   center?: [number, number];
   zoom?: number;
 }
 
-// Component to fit bounds to given positions
+// Component to fit map bounds to positions
 function FitBounds({ positions }: { positions: [number, number][] }) {
   const map = useMap();
   useEffect(() => {
@@ -40,17 +55,23 @@ function FitBounds({ positions }: { positions: [number, number][] }) {
   return null;
 }
 
-export default function Map({ ports = [], routes = [], waypoints = [], height = "320px", center = [20, 30], zoom = 3 }: MapProps) {
+export default function Map({
+  ports = [],
+  routes = [],
+  waypoints = [],
+  height = "320px",
+  center = [20, 30],
+  zoom = 3,
+}: MapProps) {
   const [isClient, setIsClient] = useState(false);
   const [allPositions, setAllPositions] = useState<[number, number][]>([]);
 
   useEffect(() => {
     setIsClient(true);
-    // Collect positions from ports and waypoints
-    const pos: [number, number][] = [];
-    ports.forEach(p => pos.push([p.latitude, p.longitude]));
-    waypoints.forEach(w => pos.push([w.lat, w.lon]));
-    setAllPositions(pos);
+    const positions: [number, number][] = [];
+    ports.forEach((p) => positions.push([p.latitude, p.longitude]));
+    waypoints.forEach((w) => positions.push([w.lat, w.lon]));
+    setAllPositions(positions);
   }, [ports, waypoints]);
 
   if (!isClient) {
@@ -64,8 +85,14 @@ export default function Map({ ports = [], routes = [], waypoints = [], height = 
     );
   }
 
-  // Build polyline positions from waypoints
-  const polylinePositions = waypoints.map(w => [w.lat, w.lon] as [number, number]);
+  // ✅ Build polyline positions from ALL waypoints in order
+  const polylinePositions = waypoints.map((w) => [w.lat, w.lon] as [number, number]);
+
+  // ✅ For routes prop, also build polyline
+  const routePolylines = routes.map((route) => {
+    if (!route.waypoints || route.waypoints.length < 2) return null;
+    return route.waypoints.map((w) => [w.lat, w.lon] as [number, number]);
+  }).filter(Boolean);
 
   return (
     <div className="rounded-xl overflow-hidden border border-white/5" style={{ height }}>
@@ -95,13 +122,24 @@ export default function Map({ ports = [], routes = [], waypoints = [], height = 
           </Marker>
         ))}
 
-        {/* Route Lines (if routes prop is provided) */}
-        {routes.map((route) => {
-          if (!route.waypoints || route.waypoints.length < 2) return null;
-          const positions = route.waypoints.map((w: any) => [w.lat, w.lon] as [number, number]);
+        {/* ✅ Waypoints Polyline – connects ALL waypoints in order */}
+        {polylinePositions.length > 1 && (
+          <Polyline
+            positions={polylinePositions}
+            color="#7c5cff"
+            weight={4}
+            opacity={0.9}
+            dashArray={null}
+            smoothFactor={1}
+          />
+        )}
+
+        {/* Route Polylines from routes prop */}
+        {routePolylines.map((positions, idx) => {
+          if (!positions || positions.length < 2) return null;
           return (
             <Polyline
-              key={route.id}
+              key={idx}
               positions={positions}
               color="#00d4ff"
               weight={3}
@@ -111,23 +149,13 @@ export default function Map({ ports = [], routes = [], waypoints = [], height = 
           );
         })}
 
-        {/* Waypoints polyline (from waypoints prop) */}
-        {polylinePositions.length > 1 && (
-          <Polyline
-            positions={polylinePositions}
-            color="#7c5cff"
-            weight={4}
-            opacity={0.9}
-          />
-        )}
-
-        {/* Waypoint Markers with sequence number as label */}
+        {/* Waypoint Markers with sequence numbers */}
         {waypoints.map((w, idx) => (
           <Marker
             key={idx}
             position={[w.lat, w.lon]}
             icon={L.divIcon({
-              className: "bg-cyan-400 text-black font-bold rounded-full w-6 h-6 flex items-center justify-center text-xs border-2 border-white",
+              className: "bg-cyan-400 text-black font-bold rounded-full w-6 h-6 flex items-center justify-center text-xs border-2 border-white shadow-lg",
               html: `${idx + 1}`,
               iconSize: [24, 24],
               iconAnchor: [12, 12],
@@ -135,16 +163,18 @@ export default function Map({ ports = [], routes = [], waypoints = [], height = 
           >
             <Popup>
               <div className="text-white bg-[#0a1628] p-2 rounded-lg">
-                <p className="font-semibold">{w.label || `Waypoint ${idx+1}`}</p>
+                <p className="font-semibold">{w.label || `Waypoint ${idx + 1}`}</p>
                 <p className="text-xs text-gray-400">
-                  {w.lat.toFixed(4)}, {w.lon.toFixed(4)}
+                  Lat: {w.lat.toFixed(4)}, Lon: {w.lon.toFixed(4)}
                 </p>
+                {idx === 0 && <p className="text-xs text-cyan-400">📍 Origin</p>}
+                {idx === waypoints.length - 1 && <p className="text-xs text-cyan-400">🏁 Destination</p>}
               </div>
             </Popup>
           </Marker>
         ))}
 
-        {/* Fit bounds if we have positions */}
+        {/* Fit bounds */}
         {allPositions.length > 0 && <FitBounds positions={allPositions} />}
       </MapContainer>
     </div>
