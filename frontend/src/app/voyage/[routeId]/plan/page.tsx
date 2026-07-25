@@ -20,6 +20,7 @@ const MapComponent = dynamic(() => import("@/components/Map"), {
   ),
 });
 
+// ==================== PORT COORDINATES ====================
 const PORT_COORDS: { [key: string]: { lat: number; lon: number } } = {
   "Mumbai": { lat: 19.0760, lon: 72.8777 },
   "Singapore": { lat: 1.3521, lon: 103.8198 },
@@ -50,10 +51,56 @@ function getCoords(portName: string) {
   return key ? PORT_COORDS[key] : { lat: 20, lon: 80 };
 }
 
-function generateGreatCircleWaypoints(
+// ==================== SEA CORRIDOR WAYPOINTS ====================
+// Predefined sea‑faring routes to avoid land
+const SEA_CORRIDORS: Record<string, { lat: number; lon: number }[]> = {
+  "Mumbai-Singapore": [
+    { lat: 19.0760, lon: 72.8777 },  // Mumbai
+    { lat: 15.0, lon: 73.0 },        // off Gujarat coast
+    { lat: 10.5, lon: 75.5 },        // off Kerala
+    { lat: 7.5, lon: 77.5 },         // south of India
+    { lat: 5.5, lon: 80.5 },         // south of Sri Lanka
+    { lat: 5.0, lon: 85.0 },         // Bay of Bengal
+    { lat: 4.5, lon: 92.0 },         // Nicobar area
+    { lat: 4.0, lon: 98.0 },         // Malacca entrance
+    { lat: 1.3521, lon: 103.8198 },  // Singapore
+  ],
+  "Chennai-Singapore": [
+    { lat: 13.0827, lon: 80.2707 },  // Chennai
+    { lat: 10.5, lon: 80.5 },        // off TN coast
+    { lat: 7.5, lon: 81.0 },         // south of Sri Lanka
+    { lat: 5.5, lon: 85.0 },         // Bay of Bengal
+    { lat: 4.5, lon: 92.0 },         // Nicobar
+    { lat: 4.0, lon: 98.0 },         // Malacca
+    { lat: 1.3521, lon: 103.8198 },  // Singapore
+  ],
+  "Mumbai-Dubai": [
+    { lat: 19.0760, lon: 72.8777 },  // Mumbai
+    { lat: 20.0, lon: 68.0 },        // off Gujarat
+    { lat: 22.0, lon: 62.0 },        // Arabian Sea
+    { lat: 24.0, lon: 58.0 },        // near Oman
+    { lat: 25.2048, lon: 55.2708 },  // Dubai
+  ],
+  // Add more as needed
+};
+
+function getSeaCorridor(origin: string, dest: string) {
+  const key1 = `${origin}-${dest}`;
+  const key2 = `${dest}-${origin}`;
+  let corridor = SEA_CORRIDORS[key1] || SEA_CORRIDORS[key2];
+  if (corridor) {
+    // If we have the reverse, reverse the waypoints
+    if (SEA_CORRIDORS[key2]) corridor = [...corridor].reverse();
+    return corridor;
+  }
+  return null;
+}
+
+// ==================== GREAT-CIRCLE HELPER ====================
+function greatCircleInterpolate(
   origin: { lat: number; lon: number },
   dest: { lat: number; lon: number },
-  numPoints: number = 10
+  numPoints: number = 5
 ) {
   const lat1 = origin.lat * Math.PI / 180;
   const lon1 = origin.lon * Math.PI / 180;
@@ -71,8 +118,6 @@ function generateGreatCircleWaypoints(
       wps.push({
         lat: origin.lat + (dest.lat - origin.lat) * t,
         lon: origin.lon + (dest.lon - origin.lon) * t,
-        sequence: i + 1,
-        reason: i === 0 ? "Origin" : (i === numPoints ? "Destination" : `Waypoint ${i}`),
       });
     }
     return wps;
@@ -85,18 +130,64 @@ function generateGreatCircleWaypoints(
     const x = A * Math.cos(lat1) * Math.cos(lon1) + B * Math.cos(lat2) * Math.cos(lon2);
     const y = A * Math.cos(lat1) * Math.sin(lon1) + B * Math.cos(lat2) * Math.sin(lon2);
     const z = A * Math.sin(lat1) + B * Math.sin(lat2);
-    const lat = Math.atan2(z, Math.sqrt(x * x + y * y));
+    const lat = Math.atan2(z, Math.sqrt(x*x + y*y));
     const lon = Math.atan2(y, x);
     waypoints.push({
       lat: lat * 180 / Math.PI,
       lon: lon * 180 / Math.PI,
-      sequence: i + 1,
-      reason: i === 0 ? "Origin" : (i === numPoints ? "Destination" : `Waypoint ${i}`),
     });
   }
   return waypoints;
 }
 
+// ==================== MAIN GENERATOR ====================
+function generateSeaRouteWaypoints(
+  originName: string,
+  destName: string,
+  numPointsPerSegment: number = 3
+) {
+  const originCoords = getCoords(originName);
+  const destCoords = getCoords(destName);
+
+  // 1. Check if we have a predefined sea corridor
+  const corridor = getSeaCorridor(originName, destName);
+  if (corridor) {
+    // Interpolate between each consecutive pair in the corridor
+    let allWps: { lat: number; lon: number }[] = [];
+    for (let i = 0; i < corridor.length - 1; i++) {
+      const seg = greatCircleInterpolate(corridor[i], corridor[i+1], numPointsPerSegment);
+      if (i === 0) allWps = allWps.concat(seg);
+      else allWps = allWps.concat(seg.slice(1)); // avoid duplicate points
+    }
+    // Ensure we have at least 2 points
+    if (allWps.length < 2) allWps = [originCoords, destCoords];
+    // Add sequence and reason
+    return allWps.map((p, idx) => ({
+      lat: p.lat,
+      lon: p.lon,
+      sequence: idx + 1,
+      reason: idx === 0 ? "Origin" : (idx === allWps.length - 1 ? "Destination" : `Waypoint ${idx}`),
+    }));
+  }
+
+  // 2. Fallback: great‑circle but with a slight offset to avoid obvious land (shift the midpoint)
+  // We'll shift the midpoint towards the sea by adding a delta
+  const midLat = (originCoords.lat + destCoords.lat) / 2;
+  const midLon = (originCoords.lon + destCoords.lon) / 2;
+  // For Indian routes, shift towards the sea (e.g., add 5° east for eastbound)
+  const seaMid = { lat: midLat, lon: midLon + 3.0 }; // crude offset
+  const wps = greatCircleInterpolate(originCoords, seaMid, 3);
+  const wps2 = greatCircleInterpolate(seaMid, destCoords, 3);
+  const combined = [...wps, ...wps2.slice(1)];
+  return combined.map((p, idx) => ({
+    lat: p.lat,
+    lon: p.lon,
+    sequence: idx + 1,
+    reason: idx === 0 ? "Origin" : (idx === combined.length - 1 ? "Destination" : `Waypoint ${idx}`),
+  }));
+}
+
+// ==================== COMPONENT ====================
 export default function VoyagePlannerPage() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -136,7 +227,6 @@ export default function VoyagePlannerPage() {
         }
 
         if (!isMounted) return;
-
         setRoute(data);
 
         let selected = null;
@@ -147,13 +237,12 @@ export default function VoyagePlannerPage() {
           selected = data.options[0];
         }
 
+        // If no option, create one with sea‑route waypoints
         if (!selected) {
           setUsingMock(true);
           const origin = data.origin_port || "Mumbai";
           const dest = data.destination_port || "Singapore";
-          const originCoords = getCoords(origin);
-          const destCoords = getCoords(dest);
-          const waypoints = generateGreatCircleWaypoints(originCoords, destCoords, 10);
+          const waypoints = generateSeaRouteWaypoints(origin, dest, 4);
           selected = {
             id: "dummy-" + Date.now(),
             route_type: data.priority || "balanced",
@@ -166,13 +255,12 @@ export default function VoyagePlannerPage() {
           };
         }
 
+        // Ensure waypoints exist and use sea route
         if (selected && (!selected.waypoints || selected.waypoints.length < 2)) {
           setUsingMock(true);
           const origin = data.origin_port || "Mumbai";
           const dest = data.destination_port || "Singapore";
-          const originCoords = getCoords(origin);
-          const destCoords = getCoords(dest);
-          selected.waypoints = generateGreatCircleWaypoints(originCoords, destCoords, 10);
+          selected.waypoints = generateSeaRouteWaypoints(origin, dest, 4);
         }
 
         setSelectedOption(selected);
@@ -183,9 +271,7 @@ export default function VoyagePlannerPage() {
           setUsingMock(true);
           const origin = "Mumbai";
           const dest = "Singapore";
-          const originCoords = getCoords(origin);
-          const destCoords = getCoords(dest);
-          const waypoints = generateGreatCircleWaypoints(originCoords, destCoords, 10);
+          const waypoints = generateSeaRouteWaypoints(origin, dest, 4);
           setRoute({ origin_port: origin, destination_port: dest, priority: "balanced" });
           setSelectedOption({
             id: "fallback-" + Date.now(),
@@ -265,26 +351,27 @@ export default function VoyagePlannerPage() {
   const waypoints = selectedOption.waypoints || [];
   const waypointsForMap = waypoints.map((w: any) => ({ lat: w.lat, lon: w.lon }));
 
+  // Compute directions using Haversine
   const steps = waypoints.length > 1 ? waypoints.map((w: any, i: number) => {
     if (i === 0) return null;
-    const prev = waypoints[i - 1];
+    const prev = waypoints[i-1];
     const R = 6371;
     const dLat = (w.lat - prev.lat) * Math.PI / 180;
     const dLon = (w.lon - prev.lon) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(prev.lat * Math.PI / 180) * Math.cos(w.lat * Math.PI / 180) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const a = Math.sin(dLat/2)*Math.sin(dLat/2) +
+              Math.cos(prev.lat * Math.PI/180) * Math.cos(w.lat * Math.PI/180) *
+              Math.sin(dLon/2)*Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     const distance_km = R * c;
     const distance_nm = distance_km / 1.852;
     const bearing = Math.atan2(
-      Math.sin(dLon) * Math.cos(w.lat * Math.PI / 180),
-      Math.cos(prev.lat * Math.PI / 180) * Math.sin(w.lat * Math.PI / 180) -
-      Math.sin(prev.lat * Math.PI / 180) * Math.cos(w.lat * Math.PI / 180) * Math.cos(dLon)
+      Math.sin(dLon) * Math.cos(w.lat * Math.PI/180),
+      Math.cos(prev.lat * Math.PI/180) * Math.sin(w.lat * Math.PI/180) -
+      Math.sin(prev.lat * Math.PI/180) * Math.cos(w.lat * Math.PI/180) * Math.cos(dLon)
     ) * 180 / Math.PI;
     return {
       from: i === 1 ? "Origin" : `WP ${i}`,
-      to: i === waypoints.length - 1 ? "Destination" : `WP ${i + 1}`,
+      to: i === waypoints.length - 1 ? "Destination" : `WP ${i+1}`,
       distance: distance_nm.toFixed(1),
       bearing: ((bearing % 360) + 360) % 360 === 0 ? "000" : (((bearing % 360) + 360) % 360).toFixed(0),
     };
@@ -311,7 +398,6 @@ export default function VoyagePlannerPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2">
                 <GlassCard glow className="p-4 border border-white/5">
-                  {/* ✅ FIXED: pass both waypoints and routes */}
                   <MapComponent
                     waypoints={waypointsForMap}
                     routes={[{
@@ -352,7 +438,7 @@ export default function VoyagePlannerPage() {
                       {steps.map((step: any, idx: number) => (
                         <div key={idx} className="flex items-start gap-2 border-b border-white/5 pb-2 last:border-0">
                           <div className="w-6 h-6 rounded-full bg-cyan-400/20 flex items-center justify-center text-xs font-bold text-cyan-300 flex-shrink-0">
-                            {idx + 1}
+                            {idx+1}
                           </div>
                           <div>
                             <p className="text-sm text-white">{step.from} → {step.to}</p>
