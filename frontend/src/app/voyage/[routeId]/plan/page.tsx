@@ -8,7 +8,6 @@ import { GlassCard, Button } from "@/components/ui";
 import dynamic from "next/dynamic";
 import api from "@/lib/api";
 
-// Dynamically import Map
 const MapComponent = dynamic(() => import("@/components/Map"), {
   ssr: false,
   loading: () => (
@@ -21,7 +20,6 @@ const MapComponent = dynamic(() => import("@/components/Map"), {
   ),
 });
 
-// Hardcoded port coordinates for fallback
 const PORT_COORDS: { [key: string]: { lat: number; lon: number } } = {
   "Mumbai": { lat: 19.0760, lon: 72.8777 },
   "Singapore": { lat: 1.3521, lon: 103.8198 },
@@ -33,6 +31,28 @@ const PORT_COORDS: { [key: string]: { lat: number; lon: number } } = {
   "Dubai": { lat: 25.2048, lon: 55.2708 },
   "Chicago": { lat: 41.8781, lon: -87.6298 },
 };
+
+function generateWaypoints(origin: { lat: number; lon: number }, dest: { lat: number; lon: number }, count: number = 5) {
+  const waypoints = [];
+  for (let i = 0; i <= count; i++) {
+    const t = i / count;
+    waypoints.push({
+      lat: origin.lat + (dest.lat - origin.lat) * t,
+      lon: origin.lon + (dest.lon - origin.lon) * t,
+      sequence: i + 1,
+      reason: i === 0 ? "Origin" : (i === count ? "Destination" : `Waypoint ${i}`),
+    });
+  }
+  return waypoints;
+}
+
+function getCoords(portName: string) {
+  // Try exact match, then partial match
+  const exact = PORT_COORDS[portName];
+  if (exact) return exact;
+  const key = Object.keys(PORT_COORDS).find(k => portName.includes(k) || k.includes(portName));
+  return key ? PORT_COORDS[key] : { lat: 20, lon: 80 };
+}
 
 export default function VoyagePlannerPage() {
   const params = useParams();
@@ -47,14 +67,37 @@ export default function VoyagePlannerPage() {
   const [usingMock, setUsingMock] = useState(false);
 
   useEffect(() => {
-    const fetchRoute = async () => {
+    let isMounted = true;
+    let timeoutId: NodeJS.Timeout;
+
+    const loadData = async () => {
       try {
         setLoading(true);
-        const res = await api.get(`/api/v1/routes/${routeId}`);
-        const data = res.data;
+        setError("");
+        setUsingMock(false);
+
+        // Try to fetch from API with a 3-second timeout
+        const fetchPromise = api.get(`/api/v1/routes/${routeId}`);
+        const timeoutPromise = new Promise((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error("Request timed out")), 3000);
+        });
+
+        let data;
+        try {
+          const res = await Promise.race([fetchPromise, timeoutPromise]) as any;
+          clearTimeout(timeoutId);
+          data = res.data;
+        } catch (err) {
+          clearTimeout(timeoutId);
+          console.warn("API fetch failed or timed out – using fallback data.");
+          throw err;
+        }
+
+        if (!isMounted) return;
+
         setRoute(data);
 
-        // Find the selected option
+        // Find selected option
         let selected = null;
         if (optionId) {
           selected = data.options?.find((o: any) => o.id === optionId);
@@ -63,16 +106,13 @@ export default function VoyagePlannerPage() {
           selected = data.options[0];
         }
 
-        // If no option found, create a dummy one
+        // If no option, create dummy
         if (!selected) {
-          console.warn("No options found – generating dummy option.");
           setUsingMock(true);
-          // Get origin/destination port names
           const origin = data.origin_port || "Mumbai";
           const dest = data.destination_port || "Singapore";
-          // Generate waypoints
-          const originCoords = PORT_COORDS[origin] || { lat: 19.0760, lon: 72.8777 };
-          const destCoords = PORT_COORDS[dest] || { lat: 1.3521, lon: 103.8198 };
+          const originCoords = getCoords(origin);
+          const destCoords = getCoords(dest);
           const waypoints = generateWaypoints(originCoords, destCoords, 5);
           selected = {
             id: "dummy-" + Date.now(),
@@ -86,69 +126,52 @@ export default function VoyagePlannerPage() {
           };
         }
 
-        // Ensure the selected option has waypoints
+        // Ensure waypoints exist
         if (selected && (!selected.waypoints || selected.waypoints.length < 2)) {
+          setUsingMock(true);
           const origin = data.origin_port || "Mumbai";
           const dest = data.destination_port || "Singapore";
-          const originCoords = PORT_COORDS[origin] || { lat: 19.0760, lon: 72.8777 };
-          const destCoords = PORT_COORDS[dest] || { lat: 1.3521, lon: 103.8198 };
+          const originCoords = getCoords(origin);
+          const destCoords = getCoords(dest);
           selected.waypoints = generateWaypoints(originCoords, destCoords, 5);
-          setUsingMock(true);
         }
 
         setSelectedOption(selected);
-        setError("");
-      } catch (err: any) {
-        console.error("Fetch voyage error:", err);
-        setError("Could not load voyage plan. Please try again.");
-        // Fallback: generate dummy route anyway
-        const dummyRoute = {
-          id: routeId,
-          origin_port: "Mumbai",
-          destination_port: "Singapore",
-          priority: "balanced",
-        };
-        setRoute(dummyRoute);
-        const waypoints = generateWaypoints(
-          { lat: 19.0760, lon: 72.8777 },
-          { lat: 1.3521, lon: 103.8198 },
-          5
-        );
-        setSelectedOption({
-          id: "fallback-" + Date.now(),
-          route_type: "balanced",
-          total_distance_nm: 1425,
-          estimated_duration_hours: 89.3,
-          total_fuel_tons: 27,
-          fuel_cost_usd: 16200,
-          weather_risk_score: 15,
-          waypoints: waypoints,
-        });
-        setUsingMock(true);
+      } catch (err) {
+        console.error("Error loading voyage:", err);
+        if (isMounted) {
+          setError("Could not load route. Showing demo data.");
+          // Fallback to dummy data
+          setUsingMock(true);
+          const origin = "Mumbai";
+          const dest = "Singapore";
+          const originCoords = getCoords(origin);
+          const destCoords = getCoords(dest);
+          const waypoints = generateWaypoints(originCoords, destCoords, 5);
+          setRoute({ origin_port: origin, destination_port: dest, priority: "balanced" });
+          setSelectedOption({
+            id: "fallback-" + Date.now(),
+            route_type: "balanced",
+            total_distance_nm: 1425,
+            estimated_duration_hours: 89.3,
+            total_fuel_tons: 27,
+            fuel_cost_usd: 16200,
+            weather_risk_score: 15,
+            waypoints: waypoints,
+          });
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
 
-    if (routeId) {
-      fetchRoute();
-    }
-  }, [routeId, optionId]);
+    loadData();
 
-  // Helper: generate waypoints between two coordinates
-  function generateWaypoints(origin: { lat: number; lon: number }, dest: { lat: number; lon: number }, count: number) {
-    const waypoints = [];
-    for (let i = 0; i <= count; i++) {
-      const t = i / count;
-      waypoints.push({
-        lat: origin.lat + (dest.lat - origin.lat) * t,
-        lon: origin.lon + (dest.lon - origin.lon) * t,
-        sequence: i + 1,
-        reason: i === 0 ? "Origin" : (i === count ? "Destination" : `Waypoint ${i}`),
-      });
-    }
-    return waypoints;
-  }
+    return () => {
+      isMounted = false;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [routeId, optionId]);
 
   if (loading) {
     return (
@@ -163,7 +186,7 @@ export default function VoyagePlannerPage() {
     );
   }
 
-  if (error) {
+  if (error && !selectedOption) {
     return (
       <ProtectedRoute>
         <div className="min-h-screen bg-[#060b1a] p-8">
@@ -204,13 +227,12 @@ export default function VoyagePlannerPage() {
   const waypoints = selectedOption.waypoints || [];
   const waypointsForMap = waypoints.map((w: any) => ({ lat: w.lat, lon: w.lon }));
 
-  // Compute step-by-step directions
   const steps = waypoints.length > 1 ? waypoints.map((w: any, i: number) => {
     if (i === 0) return null;
     const prev = waypoints[i-1];
     const dLat = w.lat - prev.lat;
     const dLon = w.lon - prev.lon;
-    const distance = Math.sqrt(dLat*dLat + dLon*dLon) * 111; // approximate nm
+    const distance = Math.sqrt(dLat*dLat + dLon*dLon) * 111;
     const bearing = Math.atan2(dLon, dLat) * 180 / Math.PI;
     return {
       from: i === 1 ? "Origin" : `WP ${i}`,
@@ -230,7 +252,7 @@ export default function VoyagePlannerPage() {
                 <h1 className="text-3xl font-bold text-white">⚓ Voyage Planner</h1>
                 <p className="text-sm text-ink-secondary">
                   {route?.origin_port || "Origin"} → {route?.destination_port || "Destination"} · {selectedOption.route_type} route
-                  {usingMock && <span className="ml-2 text-yellow-400 text-xs">(demo waypoints)</span>}
+                  {usingMock && <span className="ml-2 text-yellow-400 text-xs">(demo data)</span>}
                 </p>
               </div>
               <Button variant="outline" onClick={() => window.history.back()}>
