@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from typing import List, Optional
 from datetime import datetime
 import uuid
@@ -212,70 +213,10 @@ def list_routes(
 
     except Exception as e:
         print(f"❌ Error listing routes for user {current_user.id}: {e}")
-        return []   # Always return empty list on error
+        return []
 
 
 @router.get("/{route_id}", response_model=RouteAnalysisResponse)
-def get_route(
-    route_id: UUID,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    route = db.query(RouteAnalysis).filter(
-        RouteAnalysis.id == route_id,
-        RouteAnalysis.user_id == current_user.id
-    ).first()
-    if not route:
-        raise HTTPException(status_code=404, detail="Route not found")
-
-    origin_port = db.query(Port).filter(Port.id == route.origin_port_id).first()
-    dest_port = db.query(Port).filter(Port.id == route.destination_port_id).first()
-
-    options = db.query(RouteOption).filter(
-        RouteOption.analysis_id == route.id
-    ).all()
-
-    option_responses = []
-    for opt in options:
-        option_responses.append(RouteOptionResponse(
-            id=opt.id,
-            analysis_id=opt.analysis_id,
-            route_type=opt.route_type,
-            total_distance_nm=opt.total_distance_nm,
-            estimated_duration_hours=opt.estimated_duration_hours,
-            avg_speed_knots=opt.avg_speed_knots,
-            total_fuel_tons=opt.total_fuel_tons,
-            fuel_cost_usd=opt.fuel_cost_usd,
-            weather_risk_score=opt.weather_risk_score,
-            piracy_risk_score=opt.piracy_risk_score,
-            congestion_risk_score=opt.congestion_risk_score,
-            overall_risk_score=opt.overall_risk_score,
-            estimated_co2_tons=opt.estimated_co2_tons,
-            route_geometry=opt.route_geometry,
-            weather_summary=opt.weather_summary,
-            is_recommended=opt.is_recommended,
-            created_at=opt.created_at
-        ))
-
-    response = RouteAnalysisResponse(
-        id=route.id,
-        vessel_id=route.vessel_id,
-        origin_port=origin_port.name if origin_port else "Unknown",
-        destination_port=dest_port.name if dest_port else "Unknown",
-        priority=route.priority,
-        departure_date=route.departure_date,
-        max_acceptable_risk=route.max_acceptable_risk,
-        max_deviation_percent=route.max_deviation_percent,
-        total_options_generated=route.total_options_generated,
-        recommended_option_id=route.recommended_option_id,
-        ai_explanation=route.ai_explanation,
-        ai_model_used=route.ai_model_used,
-        status=route.status,
-        created_at=route.created_at,
-        completed_at=route.completed_at,
-        options=option_responses
-    )
-    @router.get("/{route_id}", response_model=RouteAnalysisResponse)
 def get_route(
     route_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -320,7 +261,7 @@ def get_route(
             weather_summary=opt.weather_summary,
             is_recommended=opt.is_recommended,
             created_at=opt.created_at,
-            waypoints=waypoints   # <-- ADD THIS LINE
+            waypoints=waypoints
         ))
 
     response = RouteAnalysisResponse(
@@ -341,5 +282,4 @@ def get_route(
         completed_at=route.completed_at,
         options=option_responses
     )
-    return response
     return response
