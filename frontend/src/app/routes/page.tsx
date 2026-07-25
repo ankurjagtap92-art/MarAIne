@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PageTransition from "@/components/PageTransition";
@@ -18,7 +19,6 @@ interface RouteItem {
   created_at: string;
 }
 
-// ✅ Skeleton loader
 const RouteSkeleton = () => (
   <div className="bg-[#0a1628]/50 rounded-2xl border border-white/5 p-6 animate-pulse">
     <div className="flex justify-between items-start mb-4">
@@ -37,6 +37,7 @@ const RouteSkeleton = () => (
 );
 
 export default function RoutesPage() {
+  const router = useRouter();
   const [routes, setRoutes] = useState<RouteItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -49,14 +50,23 @@ export default function RoutesPage() {
       setError("");
     } catch (err: any) {
       console.error("Fetch routes error:", err);
+
+      // ✅ Handle 401 – interceptor already redirects; just clear error
+      if (err.response?.status === 401) {
+        setError("");
+        setRoutes([]);
+        return;
+      }
+
       if (err.response?.status === 404) {
         const mockRoutes = JSON.parse(localStorage.getItem("mockRoutes") || "[]");
         setRoutes(mockRoutes);
         setError("");
-      } else {
-        setError("Could not load routes. Please try again.");
-        setRoutes([]);
+        return;
       }
+
+      setError("Could not load routes. Please try again.");
+      setRoutes([]);
     } finally {
       setLoading(false);
     }
@@ -94,7 +104,6 @@ export default function RoutesPage() {
       <PageTransition>
         <div className="min-h-screen bg-[#060b1a] p-8 relative">
           <div className="max-w-7xl mx-auto">
-            {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
               <div>
                 <h1 className="text-4xl font-bold text-white tracking-tight flex items-center gap-3">
@@ -143,7 +152,6 @@ export default function RoutesPage() {
                         <Button size="lg" className="group">
                           <span className="flex items-center gap-2">
                             Analyze Route
-                            {/* Inline SVG ArrowUpRight */}
                             <svg className="h-4 w-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                               <path d="M7 17L17 7" />
                               <path d="M7 7h10v10" />
@@ -199,7 +207,6 @@ export default function RoutesPage() {
                             <Link href={`/routes/${route.id}`}>
                               <Button variant="outline" size="sm" fullWidth className="group-hover:border-cyan-400/50 transition-colors">
                                 View Details
-                                {/* Inline SVG ArrowUpRight */}
                                 <svg className="h-4 w-4 ml-1 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                   <path d="M7 17L17 7" />
                                   <path d="M7 7h10v10" />

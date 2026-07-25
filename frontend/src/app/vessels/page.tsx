@@ -53,14 +53,23 @@ export default function VesselsPage() {
       setError("");
     } catch (err: any) {
       console.error("Fetch vessels error:", err);
+
+      // ✅ Handle 401 – interceptor already redirects; just clear error
+      if (err.response?.status === 401) {
+        setError("");
+        setVessels([]);
+        return;
+      }
+
       if (err.response?.status === 404) {
         const mockVessels = JSON.parse(localStorage.getItem("mockVessels") || "[]");
         setVessels(mockVessels);
         setError("");
-      } else {
-        setError("Could not load vessels.");
-        setVessels([]);
+        return;
       }
+
+      setError("Could not load vessels.");
+      setVessels([]);
     } finally {
       setLoading(false);
     }
@@ -167,7 +176,6 @@ export default function VesselsPage() {
                         <Button size="lg" className="group">
                           <span className="flex items-center gap-2">
                             Add Vessel
-                            {/* Inline SVG ArrowUpRight */}
                             <svg className="h-4 w-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                               <path d="M7 17L17 7" />
                               <path d="M7 7h10v10" />
@@ -216,7 +224,6 @@ export default function VesselsPage() {
                           <div className="mt-5 pt-4 border-t border-white/5 flex gap-2">
                             <Link href={`/vessels/${vessel.id}/edit`} className="flex-1">
                               <Button variant="outline" size="sm" fullWidth className="group-hover:border-cyan-400/50 transition-colors">
-                                {/* Inline SVG Edit */}
                                 <svg className="h-4 w-4 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                   <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                                   <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
@@ -235,7 +242,6 @@ export default function VesselsPage() {
                                 "Deleting..."
                               ) : (
                                 <>
-                                  {/* Inline SVG Trash */}
                                   <svg className="h-4 w-4 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                     <path d="M3 6h18" />
                                     <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
