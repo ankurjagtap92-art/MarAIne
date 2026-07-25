@@ -20,6 +20,7 @@ const MapComponent = dynamic(() => import("@/components/Map"), {
   ),
 });
 
+// Hardcoded port coordinates (add more if needed)
 const PORT_COORDS: { [key: string]: { lat: number; lon: number } } = {
   "Mumbai": { lat: 19.0760, lon: 72.8777 },
   "Singapore": { lat: 1.3521, lon: 103.8198 },
@@ -30,28 +31,86 @@ const PORT_COORDS: { [key: string]: { lat: number; lon: number } } = {
   "Gujrat": { lat: 21.1702, lon: 72.8311 },
   "Dubai": { lat: 25.2048, lon: 55.2708 },
   "Chicago": { lat: 41.8781, lon: -87.6298 },
+  "New York": { lat: 40.7128, lon: -74.0060 },
+  "London": { lat: 51.5074, lon: -0.1278 },
+  "Rotterdam": { lat: 51.9225, lon: 4.4792 },
+  "Shanghai": { lat: 31.2304, lon: 121.4737 },
+  "Tokyo": { lat: 35.6762, lon: 139.6503 },
+  "Sydney": { lat: -33.8688, lon: 151.2093 },
+  "Cape Town": { lat: -33.9249, lon: 18.4241 },
 };
 
-function generateWaypoints(origin: { lat: number; lon: number }, dest: { lat: number; lon: number }, count: number = 5) {
+// Get coordinates for a port name (fuzzy match)
+function getCoords(portName: string) {
+  if (!portName) return { lat: 20, lon: 80 };
+  // Try exact match, then partial
+  const exact = PORT_COORDS[portName.trim()];
+  if (exact) return exact;
+  const key = Object.keys(PORT_COORDS).find(k =>
+    portName.toLowerCase().includes(k.toLowerCase()) ||
+    k.toLowerCase().includes(portName.toLowerCase())
+  );
+  return key ? PORT_COORDS[key] : { lat: 20, lon: 80 };
+}
+
+// Great-circle (SLERP) waypoint generation – returns realistic curved route
+function generateGreatCircleWaypoints(
+  origin: { lat: number; lon: number },
+  dest: { lat: number; lon: number },
+  numPoints: number = 10
+) {
+  // Convert to radians
+  const lat1 = origin.lat * Math.PI / 180;
+  const lon1 = origin.lon * Math.PI / 180;
+  const lat2 = dest.lat * Math.PI / 180;
+  const lon2 = dest.lon * Math.PI / 180;
+
+  // Difference in longitude
+  const dLon = lon2 - lon1;
+
+  // Central angle between points
+  const d = Math.acos(
+    Math.sin(lat1) * Math.sin(lat2) +
+    Math.cos(lat1) * Math.cos(lat2) * Math.cos(dLon)
+  );
+
+  // If points are very close, return a straight line
+  if (d < 0.001) {
+    const waypoints = [];
+    for (let i = 0; i <= numPoints; i++) {
+      const t = i / numPoints;
+      waypoints.push({
+        lat: origin.lat + (dest.lat - origin.lat) * t,
+        lon: origin.lon + (dest.lon - origin.lon) * t,
+        sequence: i + 1,
+        reason: i === 0 ? "Origin" : (i === numPoints ? "Destination" : `Waypoint ${i}`),
+      });
+    }
+    return waypoints;
+  }
+
   const waypoints = [];
-  for (let i = 0; i <= count; i++) {
-    const t = i / count;
+  for (let i = 0; i <= numPoints; i++) {
+    const t = i / numPoints;
+    // Spherical linear interpolation (SLERP)
+    const A = Math.sin((1 - t) * d) / Math.sin(d);
+    const B = Math.sin(t * d) / Math.sin(d);
+
+    const x = A * Math.cos(lat1) * Math.cos(lon1) + B * Math.cos(lat2) * Math.cos(lon2);
+    const y = A * Math.cos(lat1) * Math.sin(lon1) + B * Math.cos(lat2) * Math.sin(lon2);
+    const z = A * Math.sin(lat1) + B * Math.sin(lat2);
+
+    const lat = Math.atan2(z, Math.sqrt(x*x + y*y));
+    const lon = Math.atan2(y, x);
+
     waypoints.push({
-      lat: origin.lat + (dest.lat - origin.lat) * t,
-      lon: origin.lon + (dest.lon - origin.lon) * t,
+      lat: lat * 180 / Math.PI,
+      lon: lon * 180 / Math.PI,
       sequence: i + 1,
-      reason: i === 0 ? "Origin" : (i === count ? "Destination" : `Waypoint ${i}`),
+      reason: i === 0 ? "Origin" : (i === numPoints ? "Destination" : `Waypoint ${i}`),
     });
   }
   return waypoints;
-}
-
-function getCoords(portName: string) {
-  // Try exact match, then partial match
-  const exact = PORT_COORDS[portName];
-  if (exact) return exact;
-  const key = Object.keys(PORT_COORDS).find(k => portName.includes(k) || k.includes(portName));
-  return key ? PORT_COORDS[key] : { lat: 20, lon: 80 };
 }
 
 export default function VoyagePlannerPage() {
@@ -76,7 +135,7 @@ export default function VoyagePlannerPage() {
         setError("");
         setUsingMock(false);
 
-        // Try to fetch from API with a 3-second timeout
+        // Try API with 3s timeout
         const fetchPromise = api.get(`/api/v1/routes/${routeId}`);
         const timeoutPromise = new Promise((_, reject) => {
           timeoutId = setTimeout(() => reject(new Error("Request timed out")), 3000);
@@ -89,7 +148,7 @@ export default function VoyagePlannerPage() {
           data = res.data;
         } catch (err) {
           clearTimeout(timeoutId);
-          console.warn("API fetch failed or timed out – using fallback data.");
+          console.warn("API fetch failed – using fallback data.");
           throw err;
         }
 
@@ -106,14 +165,14 @@ export default function VoyagePlannerPage() {
           selected = data.options[0];
         }
 
-        // If no option, create dummy
+        // If no option, create dummy with realistic route
         if (!selected) {
           setUsingMock(true);
           const origin = data.origin_port || "Mumbai";
           const dest = data.destination_port || "Singapore";
           const originCoords = getCoords(origin);
           const destCoords = getCoords(dest);
-          const waypoints = generateWaypoints(originCoords, destCoords, 5);
+          const waypoints = generateGreatCircleWaypoints(originCoords, destCoords, 10);
           selected = {
             id: "dummy-" + Date.now(),
             route_type: data.priority || "balanced",
@@ -126,14 +185,14 @@ export default function VoyagePlannerPage() {
           };
         }
 
-        // Ensure waypoints exist
+        // Ensure waypoints exist and are great-circle
         if (selected && (!selected.waypoints || selected.waypoints.length < 2)) {
           setUsingMock(true);
           const origin = data.origin_port || "Mumbai";
           const dest = data.destination_port || "Singapore";
           const originCoords = getCoords(origin);
           const destCoords = getCoords(dest);
-          selected.waypoints = generateWaypoints(originCoords, destCoords, 5);
+          selected.waypoints = generateGreatCircleWaypoints(originCoords, destCoords, 10);
         }
 
         setSelectedOption(selected);
@@ -141,13 +200,13 @@ export default function VoyagePlannerPage() {
         console.error("Error loading voyage:", err);
         if (isMounted) {
           setError("Could not load route. Showing demo data.");
-          // Fallback to dummy data
           setUsingMock(true);
+          // Fallback to a realistic great-circle route between Mumbai and Singapore
           const origin = "Mumbai";
           const dest = "Singapore";
           const originCoords = getCoords(origin);
           const destCoords = getCoords(dest);
-          const waypoints = generateWaypoints(originCoords, destCoords, 5);
+          const waypoints = generateGreatCircleWaypoints(originCoords, destCoords, 10);
           setRoute({ origin_port: origin, destination_port: dest, priority: "balanced" });
           setSelectedOption({
             id: "fallback-" + Date.now(),
@@ -227,18 +286,32 @@ export default function VoyagePlannerPage() {
   const waypoints = selectedOption.waypoints || [];
   const waypointsForMap = waypoints.map((w: any) => ({ lat: w.lat, lon: w.lon }));
 
+  // Compute step-by-step directions with better distances
   const steps = waypoints.length > 1 ? waypoints.map((w: any, i: number) => {
     if (i === 0) return null;
     const prev = waypoints[i-1];
-    const dLat = w.lat - prev.lat;
-    const dLon = w.lon - prev.lon;
-    const distance = Math.sqrt(dLat*dLat + dLon*dLon) * 111;
-    const bearing = Math.atan2(dLon, dLat) * 180 / Math.PI;
+    // Haversine distance for accuracy
+    const R = 6371; // km
+    const dLat = (w.lat - prev.lat) * Math.PI / 180;
+    const dLon = (w.lon - prev.lon) * Math.PI / 180;
+    const a = Math.sin(dLat/2)*Math.sin(dLat/2) +
+              Math.cos(prev.lat * Math.PI/180) * Math.cos(w.lat * Math.PI/180) *
+              Math.sin(dLon/2)*Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const distance_km = R * c;
+    const distance_nm = distance_km / 1.852; // convert to nautical miles
+
+    const bearing = Math.atan2(
+      Math.sin(dLon) * Math.cos(w.lat * Math.PI/180),
+      Math.cos(prev.lat * Math.PI/180) * Math.sin(w.lat * Math.PI/180) -
+      Math.sin(prev.lat * Math.PI/180) * Math.cos(w.lat * Math.PI/180) * Math.cos(dLon)
+    ) * 180 / Math.PI;
+
     return {
       from: i === 1 ? "Origin" : `WP ${i}`,
       to: i === waypoints.length - 1 ? "Destination" : `WP ${i+1}`,
-      distance: distance.toFixed(1),
-      bearing: bearing.toFixed(0),
+      distance: distance_nm.toFixed(1),
+      bearing: ((bearing % 360) + 360) % 360 === 0 ? "000" : (((bearing % 360) + 360) % 360).toFixed(0),
     };
   }).filter(Boolean) : [];
 
