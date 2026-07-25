@@ -183,20 +183,25 @@ export default function VoyagePlannerPage() {
   const [selectedOption, setSelectedOption] = useState<any>(null);
   const [usingMock, setUsingMock] = useState(false);
 
-  // ✅ Maps function coordinates
-const openGoogleMaps = () => {
-  if (!selectedOption || !selectedOption.waypoints || selectedOption.waypoints.length < 2) {
-    alert("No waypoints available.");
-    return;
-  }
-
-  const waypoints = selectedOption.waypoints;
-  // Build a search query with all coordinates: "lat,lon lat,lon lat,lon ..."
-  const coordsStr = waypoints.map(w => `${w.lat},${w.lon}`).join('+');
-  // Use Google Maps search URL – it shows all as markers
-  const url = `https://www.google.com/maps/search/${coordsStr}`;
-  window.open(url, "_blank");
-};
+  // ✅ Download CSV coordinates
+  const downloadCoordinates = () => {
+    if (!selectedOption || !selectedOption.waypoints || selectedOption.waypoints.length < 2) {
+      alert("No waypoints available.");
+      return;
+    }
+    const waypoints = selectedOption.waypoints;
+    let csv = "Sequence,Latitude,Longitude,Reason\n";
+    waypoints.forEach((w: any) => {
+      csv += `${w.sequence},${w.lat},${w.lon},${w.reason || ""}\n`;
+    });
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `voyage_${route?.origin_port || "origin"}_to_${route?.destination_port || "dest"}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -386,17 +391,19 @@ const openGoogleMaps = () => {
                 </p>
               </div>
               <div className="flex gap-2">
-                {/* ✅ Google Maps Button */}
+                {/* ✅ Download Coordinates Button */}
                 <Button 
                   variant="primary" 
                   size="sm" 
-                  onClick={openGoogleMaps}
+                  onClick={downloadCoordinates}
                   className="flex items-center gap-2"
                 >
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M4 4v16h16" />
+                    <path d="M8 8l4 4-4 4" />
+                    <path d="M12 12h8" />
                   </svg>
-                  Google Maps
+                  Download Coordinates
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => window.history.back()}>
                   ← Back
