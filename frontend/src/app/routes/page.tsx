@@ -45,30 +45,34 @@ export default function RoutesPage() {
   const fetchRoutes = async () => {
     try {
       setLoading(true);
+      console.log("🔄 Fetching routes...");
       const res = await api.get("/api/v1/routes");
-      setRoutes(res.data);
+      console.log("✅ Routes response:", res.data);
+      console.log("📦 Type of response:", typeof res.data, "isArray:", Array.isArray(res.data));
+
+      // Ensure data is an array
+      const routesData = Array.isArray(res.data) ? res.data : [];
+      console.log("📊 Routes data (after validation):", routesData);
+      setRoutes(routesData);
       setError("");
     } catch (err: any) {
-      console.error("Fetch routes error:", err);
-
-      // ✅ Handle 401 – interceptor already redirects; just clear error
+      console.error("❌ Fetch routes error:", err);
       if (err.response?.status === 401) {
         setError("");
         setRoutes([]);
         return;
       }
-
       if (err.response?.status === 404) {
         const mockRoutes = JSON.parse(localStorage.getItem("mockRoutes") || "[]");
         setRoutes(mockRoutes);
         setError("");
         return;
       }
-
       setError("Could not load routes. Please try again.");
       setRoutes([]);
     } finally {
       setLoading(false);
+      console.log("🏁 Final routes state length:", routes.length);
     }
   };
 
@@ -98,6 +102,8 @@ export default function RoutesPage() {
       </ProtectedRoute>
     );
   }
+
+  const hasRoutes = routes && routes.length > 0;
 
   return (
     <ProtectedRoute>
@@ -134,7 +140,7 @@ export default function RoutesPage() {
             )}
 
             <AnimatePresence mode="wait">
-              {routes.length === 0 ? (
+              {!hasRoutes ? (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}

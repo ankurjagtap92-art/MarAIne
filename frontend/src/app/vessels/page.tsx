@@ -48,30 +48,33 @@ export default function VesselsPage() {
   const fetchVessels = async () => {
     try {
       setLoading(true);
+      console.log("🔄 Fetching vessels...");
       const res = await api.get("/api/v1/vessels");
-      setVessels(res.data);
+      console.log("✅ Vessels response:", res.data);
+      console.log("📦 Type:", typeof res.data, "isArray:", Array.isArray(res.data));
+
+      const vesselsData = Array.isArray(res.data) ? res.data : [];
+      console.log("📊 Vessels data (after validation):", vesselsData);
+      setVessels(vesselsData);
       setError("");
     } catch (err: any) {
-      console.error("Fetch vessels error:", err);
-
-      // ✅ Handle 401 – interceptor already redirects; just clear error
+      console.error("❌ Fetch vessels error:", err);
       if (err.response?.status === 401) {
         setError("");
         setVessels([]);
         return;
       }
-
       if (err.response?.status === 404) {
         const mockVessels = JSON.parse(localStorage.getItem("mockVessels") || "[]");
         setVessels(mockVessels);
         setError("");
         return;
       }
-
       setError("Could not load vessels.");
       setVessels([]);
     } finally {
       setLoading(false);
+      console.log("🏁 Final vessels state length:", vessels.length);
     }
   };
 
@@ -123,6 +126,8 @@ export default function VesselsPage() {
     );
   }
 
+  const hasVessels = vessels && vessels.length > 0;
+
   return (
     <ProtectedRoute>
       <PageTransition>
@@ -158,7 +163,7 @@ export default function VesselsPage() {
             )}
 
             <AnimatePresence mode="wait">
-              {vessels.length === 0 ? (
+              {!hasVessels ? (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
