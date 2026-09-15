@@ -1,0 +1,6 @@
+{
+  "name": "SeaVision",
+  "description": "Next-generation maritime intelligence, route optimization, and real-time fleet analytics platform",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
