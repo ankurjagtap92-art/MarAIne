@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import axios from "axios";
+import { useAuth } from "@/contexts/AuthContext";
+import LoginModal from "./LoginModal";
 import {
   Radio,
   Sparkles,
@@ -19,12 +21,44 @@ import {
   Globe,
   Activity,
   MapPin,
+  LogIn,
+  UserPlus,
+  LogOut,
 } from "lucide-react";
 
 export default function BehanceHero() {
   const [activeTab, setActiveTab] = useState("home");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Authentication state
+  const { user, isAuthenticated, logout } = useAuth();
+  const [mounted, setMounted] = useState(false);
+
+  // Login Modal State
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [loginModalTarget, setLoginModalTarget] = useState("/dashboard");
+  const [loginModalLabel, setLoginModalLabel] = useState("SeaVision Command");
+  const [loginModalMode, setLoginModalMode] = useState<"login" | "register">("login");
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const authed = mounted && isAuthenticated;
+
+  const handleAuthAction = (e: React.MouseEvent, targetUrl: string, targetLabel: string) => {
+    if (authed) {
+      // Already logged in: proceed further to targetUrl
+      return;
+    }
+    // Not logged in: intercept and open login panel modal with target remembered
+    e.preventDefault();
+    setLoginModalTarget(targetUrl);
+    setLoginModalLabel(targetLabel);
+    setLoginModalMode("login");
+    setLoginModalOpen(true);
+  };
 
   // Live real data state from SeaVision telemetry API
   const [liveData, setLiveData] = useState<{
@@ -180,7 +214,13 @@ export default function BehanceHero() {
               <Link
                 key={item.id}
                 href={item.href}
-                onClick={() => setActiveTab(item.id)}
+                onClick={(e) => {
+                  if (item.id === "new-route") {
+                    handleAuthAction(e, "/routes/new", "Voyage Planner");
+                  } else {
+                    setActiveTab(item.id);
+                  }
+                }}
                 className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
                   activeTab === item.id
                     ? "bg-gradient-to-r from-orange-500/20 to-cyan-500/20 text-white font-semibold border border-orange-500/30 shadow-sm"
@@ -193,20 +233,83 @@ export default function BehanceHero() {
           </div>
 
           {/* Right Action Group */}
-          <div className="hidden sm:flex items-center gap-3">
+          <div className="hidden sm:flex items-center gap-2.5">
             <Link
               href="/routes/new"
+              onClick={(e) => handleAuthAction(e, "/routes/new", "Voyage Simulation")}
+              id="nav-simulate-route-btn"
               className="px-3.5 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-gray-300 hover:text-white transition backdrop-blur-md"
             >
               Simulate Route
             </Link>
 
-            <Link
-              href="/login"
-              className="px-4 py-1.5 rounded-full bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-400 hover:to-amber-400 text-black font-semibold text-xs transition shadow-md shadow-orange-500/25 active:scale-95"
-            >
-              Command Sign In
-            </Link>
+            {!authed ? (
+              <>
+                {/* Clear Log In Button */}
+                <button
+                  type="button"
+                  id="nav-login-btn"
+                  onClick={() => {
+                    setLoginModalTarget("/dashboard");
+                    setLoginModalLabel("Command Center Access");
+                    setLoginModalMode("login");
+                    setLoginModalOpen(true);
+                  }}
+                  className="px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 hover:border-cyan-400/50 text-white font-semibold text-xs transition shadow-sm backdrop-blur-md flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                >
+                  <LogIn className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Log In</span>
+                </button>
+
+                {/* Clear Sign Up Button */}
+                <button
+                  type="button"
+                  id="nav-signup-btn"
+                  onClick={() => {
+                    setLoginModalTarget("/dashboard");
+                    setLoginModalLabel("Create Fleet Account");
+                    setLoginModalMode("register");
+                    setLoginModalOpen(true);
+                  }}
+                  className="px-4 py-1.5 rounded-full bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-400 hover:to-amber-400 text-black font-bold text-xs transition shadow-md shadow-orange-500/25 active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                >
+                  <UserPlus className="w-3.5 h-3.5 text-black" />
+                  <span>Sign Up</span>
+                </button>
+              </>
+            ) : (
+              <>
+                {/* Authenticated Officer Badge */}
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#091322]/90 border border-emerald-500/30 backdrop-blur-md text-xs">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-gray-300 font-mono text-[11px] truncate max-w-[120px]">
+                    {user?.full_name || "Fleet Officer"}
+                  </span>
+                  <span className="text-[10px] text-emerald-400 uppercase font-mono font-semibold">Active</span>
+                </div>
+
+                {/* Proceed to Dashboard Button */}
+                <Link
+                  href="/dashboard"
+                  id="nav-dashboard-btn"
+                  className="px-4 py-1.5 rounded-full bg-gradient-to-r from-cyan-500 via-sky-500 to-blue-600 hover:brightness-110 text-white font-semibold text-xs transition shadow-md shadow-cyan-500/20 flex items-center gap-1.5 active:scale-95"
+                >
+                  <span>Dashboard</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+
+                {/* Sign Out Button */}
+                <button
+                  type="button"
+                  id="nav-logout-btn"
+                  onClick={logout}
+                  className="p-1.5 rounded-full bg-white/5 hover:bg-red-500/20 border border-white/10 hover:border-red-500/30 text-gray-400 hover:text-red-300 transition text-xs cursor-pointer"
+                  title="Sign out of SeaVision"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              </>
+            )}
           </div>
 
           {/* Mobile Menu Toggle */}
@@ -258,18 +361,82 @@ export default function BehanceHero() {
             </Link>
             <Link
               href="/routes/new"
-              onClick={() => setMobileMenuOpen(false)}
+              onClick={(e) => {
+                setMobileMenuOpen(false);
+                handleAuthAction(e, "/routes/new", "Voyage Planner");
+              }}
               className="text-sm text-orange-400 font-medium py-1 px-2 rounded-lg hover:bg-white/5"
             >
               + Plan New Voyage
             </Link>
-            <div className="pt-2 border-t border-white/10 flex items-center justify-between">
-              <Link
-                href="/login"
-                className="w-full text-center py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-cyan-500 text-black font-semibold text-xs"
-              >
-                Sign In to SeaVision
-              </Link>
+            
+            <div className="pt-2 border-t border-white/10 flex flex-col gap-2">
+              {!authed ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    id="mobile-nav-login-btn"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      setLoginModalTarget("/dashboard");
+                      setLoginModalLabel("Command Center Access");
+                      setLoginModalMode("login");
+                      setLoginModalOpen(true);
+                    }}
+                    className="text-center py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-semibold text-xs flex items-center justify-center gap-1.5"
+                  >
+                    <LogIn className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Log In</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    id="mobile-nav-signup-btn"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      setLoginModalTarget("/dashboard");
+                      setLoginModalLabel("Create Fleet Account");
+                      setLoginModalMode("register");
+                      setLoginModalOpen(true);
+                    }}
+                    className="text-center py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 text-black font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-orange-500/20"
+                  >
+                    <UserPlus className="w-3.5 h-3.5 text-black" />
+                    <span>Sign Up</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between px-2 text-xs text-gray-300 font-mono">
+                    <span className="flex items-center gap-1.5 text-emerald-400">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>Online Officer</span>
+                    </span>
+                    <span className="text-white font-semibold truncate max-w-[150px]">{user?.full_name}</span>
+                  </div>
+                  <Link
+                    href="/dashboard"
+                    id="mobile-nav-dashboard-btn"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="w-full text-center py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-semibold text-xs flex items-center justify-center gap-2"
+                  >
+                    <span>Enter Command Dashboard</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      logout();
+                      setMobileMenuOpen(false);
+                    }}
+                    id="mobile-nav-logout-btn"
+                    className="w-full text-center py-2 rounded-xl bg-white/5 hover:bg-white/10 text-xs text-gray-400 hover:text-red-300 transition flex items-center justify-center gap-1.5"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -322,30 +489,69 @@ export default function BehanceHero() {
             <Link
               href="/routes/new"
               id="hero-plan-voyage-btn"
-              className="inline-flex items-center gap-2.5 px-7 py-3.5 rounded-full bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-400 hover:to-amber-400 text-black font-bold text-sm shadow-2xl shadow-orange-500/40 transition-all hover:scale-105 active:scale-95"
+              onClick={(e) => handleAuthAction(e, "/routes/new", "Voyage Planner")}
+              className="inline-flex items-center gap-2.5 px-7 py-3.5 rounded-full bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-400 hover:to-amber-400 text-black font-bold text-sm shadow-2xl shadow-orange-500/40 transition-all hover:scale-105 active:scale-95 cursor-pointer"
             >
               <span>Plan A Voyage</span>
               <ArrowRight className="w-4 h-4 text-black" />
             </Link>
 
             <Link
-              href="#fleet"
+              href="/vessels"
               id="hero-fleet-btn"
-              className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-[#091322]/80 hover:bg-[#091322] border border-cyan-400/40 hover:border-cyan-400 text-white font-medium text-sm backdrop-blur-xl shadow-xl transition-all hover:scale-105 active:scale-95"
+              onClick={(e) => handleAuthAction(e, "/vessels", "Fleet AIS Command")}
+              className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-[#091322]/80 hover:bg-[#091322] border border-cyan-400/40 hover:border-cyan-400 text-white font-medium text-sm backdrop-blur-xl shadow-xl transition-all hover:scale-105 active:scale-95 cursor-pointer"
             >
               <Ship className="w-4 h-4 text-cyan-400" />
               <span>Fleet AIS Command</span>
             </Link>
 
             <Link
-              href="#routes"
+              href="/routes"
               id="hero-routes-btn"
-              className="inline-flex items-center gap-2 px-5 py-3.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/40 text-gray-200 hover:text-white font-medium text-sm backdrop-blur-md shadow-lg transition-all active:scale-95"
+              onClick={(e) => handleAuthAction(e, "/routes", "Route Engine")}
+              className="inline-flex items-center gap-2 px-5 py-3.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/40 text-gray-200 hover:text-white font-medium text-sm backdrop-blur-md shadow-lg transition-all active:scale-95 cursor-pointer"
             >
               <Compass className="w-4 h-4 text-orange-400" />
               <span>Route Engine</span>
             </Link>
           </div>
+
+          {/* Quick Authentication Direct Access for Landing Page Visitors */}
+          {!authed && (
+            <div className="mt-4 inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-black/60 border border-orange-500/30 backdrop-blur-md text-xs text-gray-300 shadow-xl">
+              <span className="text-orange-400 font-medium">Ready to command the fleet?</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setLoginModalTarget("/dashboard");
+                  setLoginModalLabel("Command Center Access");
+                  setLoginModalMode("login");
+                  setLoginModalOpen(true);
+                }}
+                id="hero-chip-login-btn"
+                className="text-white font-semibold hover:text-orange-300 underline underline-offset-2 flex items-center gap-1 cursor-pointer"
+              >
+                <LogIn className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Log In</span>
+              </button>
+              <span className="text-white/20">•</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setLoginModalTarget("/dashboard");
+                  setLoginModalLabel("Create Fleet Account");
+                  setLoginModalMode("register");
+                  setLoginModalOpen(true);
+                }}
+                id="hero-chip-signup-btn"
+                className="text-orange-400 font-semibold hover:text-orange-300 underline underline-offset-2 flex items-center gap-1 cursor-pointer"
+              >
+                <UserPlus className="w-3.5 h-3.5 text-orange-400" />
+                <span>Sign Up</span>
+              </button>
+            </div>
+          )}
 
           {/* Live Vessel Marine Vector Indicator */}
           <div className="mt-7 inline-flex items-center gap-3 px-4 py-1.5 rounded-full bg-black/40 border border-white/10 backdrop-blur-md text-[11px] font-mono text-gray-300">
@@ -522,6 +728,15 @@ export default function BehanceHero() {
 
         </div>
       </footer>
+
+      {/* Interactive Login & Registration Modal Panel */}
+      <LoginModal
+        isOpen={loginModalOpen}
+        onClose={() => setLoginModalOpen(false)}
+        targetUrl={loginModalTarget}
+        targetLabel={loginModalLabel}
+        initialMode={loginModalMode}
+      />
     </div>
   );
 }

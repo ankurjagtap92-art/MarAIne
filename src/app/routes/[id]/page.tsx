@@ -5,9 +5,9 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PageTransition from "@/components/PageTransition";
-import { GlassCard, Badge, Button } from "@/components/ui";
+import { GlassCard, Button } from "@/components/ui";
 import api from "@/lib/api";
-import { ArrowLeft, Ship, ShieldCheck, Sparkles, Navigation } from "lucide-react";
+import { ArrowLeft, Sparkles, Navigation } from "lucide-react";
 
 interface RouteOption {
   id: string;

@@ -1,5 +1,11 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import BehanceHero from "@/components/BehanceHero";
+import { useAuth } from "@/contexts/AuthContext";
+import LoginModal from "@/components/LoginModal";
 import {
   Ship,
   Navigation,
@@ -17,9 +23,38 @@ import {
   TrendingDown,
   Gauge,
   Radio,
+  LogIn,
+  UserPlus,
 } from "lucide-react";
 
 export default function HomePage() {
+  const { user, isAuthenticated } = useAuth();
+  const [mounted, setMounted] = useState(false);
+
+  // Login Modal State for Landing Page Actions
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [loginModalTarget, setLoginModalTarget] = useState("/dashboard");
+  const [loginModalLabel, setLoginModalLabel] = useState("SeaVision Command");
+  const [loginModalMode, setLoginModalMode] = useState<"login" | "register">("login");
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const authed = mounted && isAuthenticated;
+
+  const handleAuthAction = (e: React.MouseEvent, targetUrl: string, targetLabel: string) => {
+    if (authed) {
+      // User is logged in: allow normal navigation to proceed
+      return;
+    }
+    // User is NOT logged in: intercept and open login panel modal
+    e.preventDefault();
+    setLoginModalTarget(targetUrl);
+    setLoginModalLabel(targetLabel);
+    setLoginModalMode("login");
+    setLoginModalOpen(true);
+  };
   return (
     <div className="min-h-screen bg-[#050811] text-white selection:bg-orange-500/30 selection:text-orange-200 scroll-smooth">
 
@@ -57,9 +92,11 @@ export default function HomePage() {
           {/* Bridge Photo & Haversine Distance Explanation Card */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center mb-16">
             <div className="lg:col-span-7 relative rounded-2xl overflow-hidden border border-[#1b3356] group shadow-2xl">
-              <img
+              <Image
                 src="/images/bridge-navigation.jpg"
                 alt="Ship bridge navigation consoles and ocean view"
+                width={800}
+                height={400}
                 className="w-full h-80 sm:h-96 object-cover group-hover:scale-105 transition-transform duration-700"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-[#050811] via-[#050811]/50 to-transparent" />
@@ -205,13 +242,17 @@ export default function HomePage() {
           <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
             <Link
               href="/routes/new"
-              className="px-7 py-3 rounded-xl bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 text-black font-semibold text-xs shadow-lg shadow-orange-500/20 hover:from-orange-400 hover:to-amber-400 transition"
+              id="landing-simulate-voyage-btn"
+              onClick={(e) => handleAuthAction(e, "/routes/new", "Voyage Simulation")}
+              className="px-7 py-3 rounded-xl bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 text-black font-semibold text-xs shadow-lg shadow-orange-500/20 hover:from-orange-400 hover:to-amber-400 transition cursor-pointer"
             >
               Simulate a Live Voyage Route ➔
             </Link>
             <Link
               href="/routes"
-              className="px-6 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-medium transition"
+              id="landing-browse-routes-btn"
+              onClick={(e) => handleAuthAction(e, "/routes", "Route Corridors")}
+              className="px-6 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-medium transition cursor-pointer"
             >
               Browse Saved Route Corridors
             </Link>
@@ -283,9 +324,11 @@ export default function HomePage() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
             
             <div className="lg:col-span-5 relative rounded-2xl overflow-hidden border border-[#1b3356] group shadow-2xl">
-              <img
-                src="/images/ship.png"
+              <Image
+                src="/images/mega-vessel-hero.jpg"
                 alt="Commercial container carrier ship sailing on deep blue sea"
+                width={800}
+                height={400}
                 className="w-full h-80 sm:h-96 object-cover group-hover:scale-105 transition-transform duration-700"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-[#050811] via-transparent to-transparent" />
@@ -372,7 +415,9 @@ export default function HomePage() {
               <div className="pt-2">
                 <Link
                   href="/vessels"
-                  className="inline-flex items-center gap-2 text-xs font-mono text-orange-400 hover:text-orange-300 transition"
+                  id="landing-manage-vessels-btn"
+                  onClick={(e) => handleAuthAction(e, "/vessels", "Fleet Vessel Registry")}
+                  className="inline-flex items-center gap-2 text-xs font-mono text-orange-400 hover:text-orange-300 transition cursor-pointer"
                 >
                   <span>Manage and add vessels in Fleet Command</span>
                   <ArrowRight className="w-3.5 h-3.5" />
@@ -524,7 +569,9 @@ export default function HomePage() {
           <div className="text-center">
             <Link
               href="/dashboard"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-semibold text-xs shadow-lg shadow-emerald-500/20 hover:opacity-90 transition"
+              id="landing-analytics-dashboard-btn"
+              onClick={(e) => handleAuthAction(e, "/dashboard", "Fleet Analytics Dashboard")}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-semibold text-xs shadow-lg shadow-emerald-500/20 hover:opacity-90 transition cursor-pointer"
             >
               <BarChart3 className="w-4 h-4" />
               <span>Explore Interactive Fleet Analytics Dashboard ➔</span>
@@ -558,9 +605,11 @@ export default function HomePage() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center mb-16">
             
             <div className="lg:col-span-6 relative rounded-2xl overflow-hidden border border-[#1b3356] group shadow-2xl">
-              <img
+              <Image
                 src="/images/container-terminal.jpg"
                 alt="Modern commercial deep water container terminal with cranes"
+                width={800}
+                height={400}
                 className="w-full h-80 sm:h-96 object-cover group-hover:scale-105 transition-transform duration-700"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-[#050811] via-[#050811]/40 to-transparent" />
@@ -728,7 +777,9 @@ export default function HomePage() {
               <span className="text-xs font-mono text-gray-400">Ready to test the live simulator?</span>
               <Link
                 href="/routes/new"
-                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 text-black font-semibold text-xs shadow-md hover:brightness-110 transition"
+                id="landing-launch-simulator-btn"
+                onClick={(e) => handleAuthAction(e, "/routes/new", "Voyage Simulator")}
+                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 text-black font-semibold text-xs shadow-md hover:brightness-110 transition cursor-pointer"
               >
                 Launch Voyage Simulator ➔
               </Link>
@@ -756,13 +807,53 @@ export default function HomePage() {
               <span className="text-gray-500 text-xs font-mono ml-2">© 2026 Maritime Route Intelligence</span>
             </div>
             
-            <div className="flex flex-wrap gap-6 text-xs text-gray-400 font-mono">
+            <div className="flex flex-wrap gap-6 text-xs text-gray-400 font-mono items-center">
               <Link href="#home" className="hover:text-orange-400 transition">Home</Link>
               <Link href="#routes" className="hover:text-orange-400 transition">Route Engine</Link>
               <Link href="#fleet" className="hover:text-orange-400 transition">Fleet Command</Link>
               <Link href="#analytics" className="hover:text-orange-400 transition">Analytics</Link>
               <Link href="#ports" className="hover:text-orange-400 transition">Ports</Link>
-              <Link href="/login" className="hover:text-orange-400 transition">Sign In</Link>
+              {!authed ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLoginModalTarget("/dashboard");
+                      setLoginModalLabel("Command Center Sign In");
+                      setLoginModalMode("login");
+                      setLoginModalOpen(true);
+                    }}
+                    id="footer-login-btn"
+                    className="hover:text-cyan-300 text-white font-medium transition cursor-pointer flex items-center gap-1"
+                  >
+                    <LogIn className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Sign In</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLoginModalTarget("/dashboard");
+                      setLoginModalLabel("Create Fleet Account");
+                      setLoginModalMode("register");
+                      setLoginModalOpen(true);
+                    }}
+                    id="footer-signup-btn"
+                    className="text-orange-400 hover:text-orange-300 font-semibold transition cursor-pointer flex items-center gap-1"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    <span>Sign Up</span>
+                  </button>
+                </>
+              ) : (
+                <Link
+                  href="/dashboard"
+                  id="footer-dashboard-btn"
+                  className="text-emerald-400 hover:text-emerald-300 font-semibold transition flex items-center gap-1.5"
+                >
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Officer Dashboard ({user?.full_name?.split(" ")[0] || "Active"}) ➔</span>
+                </Link>
+              )}
             </div>
           </div>
           
@@ -771,6 +862,15 @@ export default function HomePage() {
           </div>
         </div>
       </footer>
+
+      {/* Login & Registration Interactive Modal Panel */}
+      <LoginModal
+        isOpen={loginModalOpen}
+        onClose={() => setLoginModalOpen(false)}
+        targetUrl={loginModalTarget}
+        targetLabel={loginModalLabel}
+        initialMode={loginModalMode}
+      />
 
     </div>
   );

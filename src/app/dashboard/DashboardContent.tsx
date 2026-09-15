@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
 import axios from "axios";
 
-import { GlassCard, StatCard, Button } from "@/components/ui";
+import { StatCard, Button } from "@/components/ui";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   IconCompass,
@@ -15,7 +15,6 @@ import {
   IconChart,
   IconLogout,
   IconBell,
-  IconSearch,
 } from "@/components/ui/icons";
 
 const MapComponent = dynamic(() => import("@/components/Map"), {

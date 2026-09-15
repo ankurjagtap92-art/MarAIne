@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,6 +19,8 @@ import {
   AlertCircle,
   Radio,
   UserCheck,
+  UserPlus,
+  LogIn,
 } from "lucide-react";
 
 export default function LoginPage() {
@@ -28,8 +30,19 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [activeDemo, setActiveDemo] = useState<string | null>(null);
+  const [redirectPath, setRedirectPath] = useState<string>("/dashboard");
   const { login, demoLogin } = useAuth();
   const router = useRouter();
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const r = params.get("redirect");
+      if (r && r.startsWith("/")) {
+        setRedirectPath(r);
+      }
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,7 +51,7 @@ export default function LoginPage() {
 
     try {
       await login(email, password);
-      router.push("/dashboard");
+      router.push(redirectPath);
     } catch (err: any) {
       setError(err.message || "Authentication failed. Please verify your credentials.");
     } finally {
@@ -60,7 +73,7 @@ export default function LoginPage() {
         setPassword("password123");
       }
       await demoLogin(role);
-      router.push("/dashboard");
+      router.push(redirectPath);
     } catch (err: any) {
       setError(err.message || "Demo sign in failed. Please try again.");
     } finally {
@@ -135,11 +148,37 @@ export default function LoginPage() {
             </Link>
 
             <h1 className="mt-5 text-2xl font-semibold text-white tracking-tight">
-              Command Center Sign In
+              Command Center Login Panel
             </h1>
             <p className="mt-1 text-xs text-gray-400">
               Access optimized fairways, voyage simulations, and vessel telemetry
             </p>
+          </div>
+
+          {/* Context Alert when redirected */}
+          {redirectPath !== "/dashboard" && (
+            <div className="mb-5 p-3 rounded-xl bg-orange-500/10 border border-orange-500/30 text-xs text-orange-300 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-orange-400 shrink-0" />
+              <span>
+                Please sign in or register to access <strong>{redirectPath}</strong>.
+              </span>
+            </div>
+          )}
+
+          {/* Tab Switcher */}
+          <div className="grid grid-cols-2 p-1 bg-[#060c18] rounded-xl border border-white/5 mb-6">
+            <div className="py-2 text-xs font-semibold rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-black shadow-md shadow-orange-500/20 flex items-center justify-center gap-1.5">
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Log In</span>
+            </div>
+            <Link
+              href={`/register${redirectPath !== "/dashboard" ? `?redirect=${encodeURIComponent(redirectPath)}` : ""}`}
+              id="login-tab-to-register"
+              className="py-2 text-xs font-semibold rounded-lg text-gray-400 hover:text-white transition-all flex items-center justify-center gap-1.5"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>Sign Up / Register</span>
+            </Link>
           </div>
 
           {/* Quick Demo Login Bar */}
@@ -291,7 +330,7 @@ export default function LoginPage() {
             <p className="text-xs text-gray-400">
               New officer?{" "}
               <Link
-                href="/register"
+                href={`/register${redirectPath !== "/dashboard" ? `?redirect=${encodeURIComponent(redirectPath)}` : ""}`}
                 id="login-register-link"
                 className="text-orange-400 hover:text-orange-300 font-medium transition inline-flex items-center gap-1 hover:underline"
               >

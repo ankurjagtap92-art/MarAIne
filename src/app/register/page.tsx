@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
@@ -20,6 +20,8 @@ import {
   Sparkles,
   Radio,
   Anchor,
+  LogIn,
+  UserPlus,
 } from "lucide-react";
 
 export default function RegisterPage() {
@@ -32,8 +34,19 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [redirectPath, setRedirectPath] = useState<string>("/dashboard");
   const { register } = useAuth();
   const router = useRouter();
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const r = params.get("redirect");
+      if (r && r.startsWith("/")) {
+        setRedirectPath(r);
+      }
+    }
+  }, []);
 
   // Simple password strength calculation
   const getPasswordStrength = () => {
@@ -81,7 +94,7 @@ export default function RegisterPage() {
         company_name: company || "Merchant Shipping Fleet",
         role,
       });
-      router.push("/dashboard");
+      router.push(redirectPath);
     } catch (err: any) {
       setError(err.message || "Registration failed. Please review your details.");
     } finally {
@@ -154,6 +167,32 @@ export default function RegisterPage() {
             <p className="mt-1 text-sm text-gray-400">
               Join commercial shipping operators optimizing ocean transit & fuel
             </p>
+          </div>
+
+          {/* Context Alert when redirected */}
+          {redirectPath !== "/dashboard" && (
+            <div className="mb-5 p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-xs text-cyan-300 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-cyan-400 shrink-0" />
+              <span>
+                Register an account to proceed directly to <strong>{redirectPath}</strong>.
+              </span>
+            </div>
+          )}
+
+          {/* Tab Switcher */}
+          <div className="grid grid-cols-2 p-1 bg-[#060c18] rounded-xl border border-white/5 mb-6">
+            <Link
+              href={`/login${redirectPath !== "/dashboard" ? `?redirect=${encodeURIComponent(redirectPath)}` : ""}`}
+              id="register-tab-to-login"
+              className="py-2 text-xs font-semibold rounded-lg text-gray-400 hover:text-white transition-all flex items-center justify-center gap-1.5"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Log In</span>
+            </Link>
+            <div className="py-2 text-xs font-semibold rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-md shadow-cyan-500/20 flex items-center justify-center gap-1.5">
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>Sign Up / Register</span>
+            </div>
           </div>
 
           {/* 1-Click Sample Profile Fill */}
@@ -393,7 +432,7 @@ export default function RegisterPage() {
             <p className="text-xs text-gray-400">
               Already have an account?{" "}
               <Link
-                href="/login"
+                href={`/login${redirectPath !== "/dashboard" ? `?redirect=${encodeURIComponent(redirectPath)}` : ""}`}
                 id="register-login-link"
                 className="text-cyan-400 hover:text-cyan-300 font-medium transition inline-flex items-center gap-1 hover:underline"
               >
